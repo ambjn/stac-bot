@@ -10,6 +10,7 @@ export interface Player {
     userId: number;
     username: string;
     buyIn: number;
+    cashOut: number;
     joined: boolean;
     history: BuyInEntry[];
 }
@@ -20,16 +21,27 @@ export interface Room {
     ownerUsername: string;
     players: Player[];
     createdAt: Date;
+    settled: boolean;
 }
 
-export interface RoomSummary {
+export interface Settlement {
+    from: string;
+    to: string;
+    amount: number;
+}
+
+export interface PlayerPnL {
+    username: string;
+    buyIn: number;
+    cashOut: number;
+    pnl: number; // profit/loss (cashOut - buyIn)
+}
+
+export interface RoomSettlement {
     roomId: string;
-    owner: string;
-    totalPlayers: number;
     totalBuyIn: number;
-    players: {
-        username: string;
-        buyIn: number;
-        percentage: number;
-    }[];
+    totalCashOut: number;
+    mismatch: number;
+    players: PlayerPnL[];
+    settlements: Settlement[];
 }

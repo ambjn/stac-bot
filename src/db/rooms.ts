@@ -1,8 +1,8 @@
 import { db } from './connection';
-import { Room, Player, BuyInEntry } from '../state/types';
+import { Room, Player, BuyInEntry, Settlement, PlayerPnL, RoomSettlement } from '../state/types';
 
 // room operations
-export const createRoom = (room: Omit<Room, 'players' | 'createdAt'>): Room => {
+export const createRoom = (room: Omit<Room, 'players' | 'createdAt' | 'settled'>): Room => {
     const stmt = db.prepare(`
         INSERT INTO rooms (id, owner_id, owner_username)
         VALUES (?, ?, ?)
@@ -12,13 +12,14 @@ export const createRoom = (room: Omit<Room, 'players' | 'createdAt'>): Room => {
     return {
         ...room,
         players: [],
-        createdAt: new Date()
+        createdAt: new Date(),
+        settled: false
     };
 };
 
 export const getRoom = (roomId: string): Room | null => {
     const roomRow = db.prepare(`
-        SELECT id, owner_id, owner_username, created_at
+        SELECT id, owner_id, owner_username, settled, created_at
         FROM rooms WHERE id = ?
     `).get(roomId) as any;
 
@@ -31,13 +32,18 @@ export const getRoom = (roomId: string): Room | null => {
         ownerId: roomRow.owner_id,
         ownerUsername: roomRow.owner_username,
         players,
-        createdAt: new Date(roomRow.created_at)
+        createdAt: new Date(roomRow.created_at),
+        settled: roomRow.settled === 1
     };
 };
 
 export const deleteRoom = (roomId: string): boolean => {
     const result = db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId);
     return result.changes > 0;
+};
+
+export const setRoomSettled = (roomId: string, settled: boolean): void => {
+    db.prepare('UPDATE rooms SET settled = ? WHERE id = ?').run(settled ? 1 : 0, roomId);
 };
 
 export const getRoomsByUser = (userId: number, username: string): { id: string; role: string }[] => {
@@ -64,17 +70,17 @@ export const getRoomsByUser = (userId: number, username: string): { id: string; 
 };
 
 // player operations
-export const addPlayer = (roomId: string, player: Omit<Player, 'history'>): void => {
+export const addPlayer = (roomId: string, player: Omit<Player, 'history' | 'cashOut'>): void => {
     const stmt = db.prepare(`
-        INSERT INTO players (room_id, user_id, username, buy_in, joined)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO players (room_id, user_id, username, buy_in, cash_out, joined)
+        VALUES (?, ?, ?, ?, 0, ?)
     `);
     stmt.run(roomId, player.userId, player.username, player.buyIn, player.joined ? 1 : 0);
 };
 
 export const getPlayer = (roomId: string, userId: number, username: string): Player | null => {
     const row = db.prepare(`
-        SELECT id, user_id, username, buy_in, joined
+        SELECT id, user_id, username, buy_in, cash_out, joined
         FROM players
         WHERE room_id = ? AND (user_id = ? OR username = ?)
         LIMIT 1
@@ -88,6 +94,7 @@ export const getPlayer = (roomId: string, userId: number, username: string): Pla
         userId: row.user_id,
         username: row.username,
         buyIn: row.buy_in,
+        cashOut: row.cash_out,
         joined: row.joined === 1,
         history
     };
@@ -95,7 +102,7 @@ export const getPlayer = (roomId: string, userId: number, username: string): Pla
 
 export const getPlayerByUsername = (roomId: string, username: string): Player | null => {
     const row = db.prepare(`
-        SELECT id, user_id, username, buy_in, joined
+        SELECT id, user_id, username, buy_in, cash_out, joined
         FROM players
         WHERE room_id = ? AND username = ?
     `).get(roomId, username) as any;
@@ -108,6 +115,7 @@ export const getPlayerByUsername = (roomId: string, username: string): Player | 
         userId: row.user_id,
         username: row.username,
         buyIn: row.buy_in,
+        cashOut: row.cash_out,
         joined: row.joined === 1,
         history
     };
@@ -115,7 +123,7 @@ export const getPlayerByUsername = (roomId: string, username: string): Player | 
 
 export const getPlayers = (roomId: string): Player[] => {
     const rows = db.prepare(`
-        SELECT id, user_id, username, buy_in, joined
+        SELECT id, user_id, username, buy_in, cash_out, joined
         FROM players WHERE room_id = ?
         ORDER BY buy_in DESC
     `).all(roomId) as any[];
@@ -124,6 +132,7 @@ export const getPlayers = (roomId: string): Player[] => {
         userId: row.user_id,
         username: row.username,
         buyIn: row.buy_in,
+        cashOut: row.cash_out,
         joined: row.joined === 1,
         history: getPlayerHistory(row.id)
     }));
@@ -152,8 +161,8 @@ export const updatePlayerBuyIn = (
     if (!playerRow) {
         // create player entry for owner
         db.prepare(`
-            INSERT INTO players (room_id, user_id, username, buy_in, joined)
-            VALUES (?, ?, ?, 0, 1)
+            INSERT INTO players (room_id, user_id, username, buy_in, cash_out, joined)
+            VALUES (?, ?, ?, 0, 0, 1)
         `).run(roomId, userId, username);
 
         playerRow = db.prepare(`
@@ -183,6 +192,97 @@ export const updatePlayerBuyIn = (
     `).run(roomId, playerRow.id, amount, action);
 
     return { success: true, newTotal };
+};
+
+// cashout operations
+export const updatePlayerCashOut = (
+    roomId: string,
+    userId: number,
+    username: string,
+    amount: number
+): { success: boolean; error?: string } => {
+    const playerRow = db.prepare(`
+        SELECT id FROM players
+        WHERE room_id = ? AND (user_id = ? OR username = ?)
+    `).get(roomId, userId, username) as any;
+
+    if (!playerRow) {
+        return { success: false, error: 'player not found' };
+    }
+
+    db.prepare(`UPDATE players SET cash_out = ? WHERE id = ?`).run(amount, playerRow.id);
+    return { success: true };
+};
+
+// settlement calculations
+export const calculateSettlement = (roomId: string): RoomSettlement | null => {
+    const room = getRoom(roomId);
+    if (!room) return null;
+
+    const activePlayers = room.players.filter(p => p.joined || p.buyIn > 0);
+
+    // calculate totals
+    const totalBuyIn = activePlayers.reduce((sum, p) => sum + p.buyIn, 0);
+    const totalCashOut = activePlayers.reduce((sum, p) => sum + p.cashOut, 0);
+    const mismatch = totalCashOut - totalBuyIn;
+
+    // calculate P&L for each player
+    const playersPnL: PlayerPnL[] = activePlayers.map(p => ({
+        username: p.username,
+        buyIn: p.buyIn,
+        cashOut: p.cashOut,
+        pnl: p.cashOut - p.buyIn
+    })).sort((a, b) => b.pnl - a.pnl); // sort by profit descending
+
+    // calculate settlements (who owes whom)
+    const settlements = calculateOptimalSettlements(playersPnL);
+
+    return {
+        roomId,
+        totalBuyIn,
+        totalCashOut,
+        mismatch,
+        players: playersPnL,
+        settlements
+    };
+};
+
+// optimal settlement algorithm - minimizes number of transactions
+const calculateOptimalSettlements = (players: PlayerPnL[]): Settlement[] => {
+    const settlements: Settlement[] = [];
+
+    // separate winners and losers
+    const winners = players.filter(p => p.pnl > 0).map(p => ({ ...p }));
+    const losers = players.filter(p => p.pnl < 0).map(p => ({ ...p, pnl: Math.abs(p.pnl) }));
+
+    // sort winners by profit desc, losers by loss desc
+    winners.sort((a, b) => b.pnl - a.pnl);
+    losers.sort((a, b) => b.pnl - a.pnl);
+
+    // match losers to winners
+    let i = 0, j = 0;
+    while (i < losers.length && j < winners.length) {
+        const loser = losers[i];
+        const winner = winners[j];
+
+        const amount = Math.min(loser.pnl, winner.pnl);
+
+        if (amount > 0) {
+            settlements.push({
+                from: loser.username,
+                to: winner.username,
+                amount: Math.round(amount * 100) / 100 // round to 2 decimals
+            });
+        }
+
+        loser.pnl -= amount;
+        winner.pnl -= amount;
+
+        if (loser.pnl <= 0.01) i++; // small tolerance for floating point
+        if (winner.pnl <= 0.01) j++;
+    }
+
+    return settlements;
 };
 
 // history operations

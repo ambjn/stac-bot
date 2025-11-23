@@ -14,6 +14,7 @@ db.exec(`
         id TEXT PRIMARY KEY,
         owner_id INTEGER NOT NULL,
         owner_username TEXT NOT NULL,
+        settled INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -24,6 +25,7 @@ db.exec(`
         user_id INTEGER NOT NULL DEFAULT 0,
         username TEXT NOT NULL,
         buy_in REAL NOT NULL DEFAULT 0,
+        cash_out REAL NOT NULL DEFAULT 0,
         joined INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
         UNIQUE(room_id, username)
@@ -46,5 +48,18 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_players_user ON players(user_id);
     CREATE INDEX IF NOT EXISTS idx_history_player ON buyin_history(player_id);
 `);
+
+// migrate: add new columns if they don't exist
+try {
+    db.exec(`ALTER TABLE rooms ADD COLUMN settled INTEGER NOT NULL DEFAULT 0`);
+} catch (e) {
+    // column already exists
+}
+
+try {
+    db.exec(`ALTER TABLE players ADD COLUMN cash_out REAL NOT NULL DEFAULT 0`);
+} catch (e) {
+    // column already exists
+}
 
 console.log('database initialized:', dbPath);

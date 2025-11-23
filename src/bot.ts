@@ -9,7 +9,9 @@ import {
     registerMyRooms,
     registerAddBuyIn,
     registerRemoveBuyIn,
-    registerSummary
+    registerSummary,
+    registerCashOut,
+    registerSettle
 } from './commands';
 import { getRoom, getPlayer, updatePlayerJoined } from './db';
 import { formatLatency } from './utils/format';
@@ -88,7 +90,10 @@ bot.command('help', (ctx) => {
         `💰 buy-ins:\n` +
         `/addbuyin <roomId> <amount> - add buy-in\n` +
         `/removebuyin <roomId> <amount> - remove buy-in\n` +
-        `/summary <roomId> - view room summary`
+        `/summary <roomId> - view room summary\n\n` +
+        `🏆 settlement:\n` +
+        `/cashout <roomId> <amount> - record final chips\n` +
+        `/settle <roomId> - calculate p&l and settlements`
     );
 });
 
@@ -123,6 +128,10 @@ registerMyRooms(bot);
 registerAddBuyIn(bot);
 registerRemoveBuyIn(bot);
 registerSummary(bot);
+
+// register settlement commands
+registerCashOut(bot);
+registerSettle(bot);
 
 // global error handler
 bot.catch((err, ctx) => {

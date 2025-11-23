@@ -6,3 +6,5 @@ export * from './myrooms';
 export * from './addbuyin';
 export * from './removebuyin';
 export * from './summary';
+export * from './cashout';
+export * from './settle';

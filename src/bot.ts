@@ -1,7 +1,14 @@
 import 'dotenv/config';
 import { Telegraf, Context } from 'telegraf';
 import { loggingMiddleware } from './middleware/logging';
-import { registerCreateRoom, registerInvite } from './commands';
+import {
+    registerCreateRoom,
+    registerInvite,
+    registerJoin,
+    registerRoom,
+    registerMyRooms
+} from './commands';
+import { rooms } from './state/rooms';
 import { formatLatency } from './utils/format';
 
 const token = process.env.BOT_TOKEN;
@@ -15,21 +22,67 @@ const bot = new Telegraf<Context>(token);
 // middleware
 bot.use(loggingMiddleware);
 
-// /start command
+// /start command (handles deep links)
 bot.start((ctx) => {
     const name = ctx.from?.first_name ?? 'there';
-    return ctx.reply(`hey ${name}👋 i'm stac🎯\ntype /help to see commands.`);
+    const payload = ctx.payload; // e.g. "join_abc123"
+
+    // handle join deep link
+    if (payload?.startsWith('join_')) {
+        const roomId = payload.replace('join_', '');
+        const room = rooms.get(roomId);
+
+        if (!room) {
+            return ctx.reply(`❌ room not found.\n\nhey ${name}👋 i'm stac🎯\ntype /help to see commands.`);
+        }
+
+        const userId = ctx.from!.id;
+        const username = ctx.from!.username ?? ctx.from!.first_name ?? 'unknown';
+
+        // check if user is the owner
+        if (room.ownerId === userId) {
+            return ctx.reply(`👑 you are the owner of room ${roomId}!\n\nuse /room ${roomId} to view details.`);
+        }
+
+        // check if user was invited
+        const player = room.players.find(p => p.userId === userId || p.username === username);
+
+        if (!player) {
+            return ctx.reply(`❌ you were not invited to room ${roomId}.`);
+        }
+
+        if (player.joined) {
+            return ctx.reply(`ℹ️ you already joined room ${roomId}.\n\nuse /room ${roomId} to view details.`);
+        }
+
+        // mark as joined
+        player.joined = true;
+        player.userId = userId;
+
+        return ctx.reply(
+            `✅ welcome ${name}! you joined room ${roomId}\n\n` +
+            `use /room ${roomId} to see room details.`
+        );
+    }
+
+    // default start message
+    return ctx.reply(`hey ${name}👋 i'm stac🎯\nyour smart settlement tool🪚\n\ntype /help to see commands.`);
 });
 
 // /help command
 bot.command('help', (ctx) => {
     return ctx.reply(
         `i understand these commands:\n\n` +
+        `📋 general:\n` +
         `/start - start the bot\n` +
         `/help - show help\n` +
-        `/ping - check latency\n` +
+        `/ping - check latency\n\n` +
+        `🎯 rooms:\n` +
         `/createroom - create a new room\n` +
-        `/invite <roomId> @username - invite player to room`
+        `/invite <roomId> @username - invite player\n` +
+        `/join <roomId> - join a room you're invited to\n` +
+        `/room <roomId> - view room details\n` +
+        `/myrooms - list your rooms`
     );
 });
 
@@ -56,6 +109,9 @@ bot.command('ping', async (ctx) => {
 // register room commands
 registerCreateRoom(bot);
 registerInvite(bot);
+registerJoin(bot);
+registerRoom(bot);
+registerMyRooms(bot);
 
 // global error handler
 bot.catch((err, ctx) => {

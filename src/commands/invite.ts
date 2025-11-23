@@ -34,7 +34,8 @@ export const registerInvite = (bot: Telegraf<Context>) => {
             userId: 0, // will be set when they join
             username,
             buyIn: 0,
-            joined: false
+            joined: false,
+            history: []
         });
 
         // get bot username for deep link

@@ -25,3 +25,21 @@ export const escapeMarkdownV2 = (text: string): string => {
 export const generateRoomId = (): string => {
     return Math.random().toString(36).substring(2, 8);
 };
+
+/**
+ * formats a number as currency
+ */
+export const formatCurrency = (amount: number): string => {
+    return amount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+};
+
+/**
+ * formats a percentage
+ */
+export const formatPercentage = (value: number, total: number): string => {
+    if (total === 0) return '0.0%';
+    return ((value / total) * 100).toFixed(1) + '%';
+};

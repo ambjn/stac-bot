@@ -6,7 +6,10 @@ import {
     registerInvite,
     registerJoin,
     registerRoom,
-    registerMyRooms
+    registerMyRooms,
+    registerAddBuyIn,
+    registerRemoveBuyIn,
+    registerSummary
 } from './commands';
 import { rooms } from './state/rooms';
 import { formatLatency } from './utils/format';
@@ -82,7 +85,11 @@ bot.command('help', (ctx) => {
         `/invite <roomId> @username - invite player\n` +
         `/join <roomId> - join a room you're invited to\n` +
         `/room <roomId> - view room details\n` +
-        `/myrooms - list your rooms`
+        `/myrooms - list your rooms\n\n` +
+        `💰 buy-ins:\n` +
+        `/addbuyin <roomId> <amount> - add buy-in\n` +
+        `/removebuyin <roomId> <amount> - remove buy-in\n` +
+        `/summary <roomId> - view room summary`
     );
 });
 
@@ -112,6 +119,11 @@ registerInvite(bot);
 registerJoin(bot);
 registerRoom(bot);
 registerMyRooms(bot);
+
+// register buy-in commands
+registerAddBuyIn(bot);
+registerRemoveBuyIn(bot);
+registerSummary(bot);
 
 // global error handler
 bot.catch((err, ctx) => {

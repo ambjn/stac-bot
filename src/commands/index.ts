@@ -3,3 +3,6 @@ export * from './invite';
 export * from './join';
 export * from './room';
 export * from './myrooms';
+export * from './addbuyin';
+export * from './removebuyin';
+export * from './summary';

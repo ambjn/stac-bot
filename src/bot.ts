@@ -1,68 +1,78 @@
 import 'dotenv/config';
 import { Telegraf, Context } from 'telegraf';
+import { loggingMiddleware } from './middleware/logging';
+import { registerCreateRoom, registerInvite } from './commands';
+import { formatLatency } from './utils/format';
 
 const token = process.env.BOT_TOKEN;
 if (!token) {
-    console.error('Error: BOT_TOKEN not set in .env');
+    console.error('error: bot_token not set in .env');
     process.exit(1);
 }
 
 const bot = new Telegraf<Context>(token);
 
-bot.use(async (ctx, next) => {
-    const from = ctx.from?.username ?? `${ctx.from?.first_name ?? ''} ${ctx.from?.last_name ?? ''}`;
-    console.log(`[${new Date().toISOString()}] ${from} -> ${ctx.message?.text ?? ctx.updateType}`);
-    try {
-        await next();
-    } catch (err) {
-        console.error('middleware caught error:', err);
-        try { await ctx.reply('sorry, something went wrong.'); } catch { }
-    }
-});
+// middleware
+bot.use(loggingMiddleware);
 
+// /start command
 bot.start((ctx) => {
     const name = ctx.from?.first_name ?? 'there';
     return ctx.reply(`hey ${name}👋 i'm stac🎯\ntype /help to see commands.`);
 });
 
-// /help
+// /help command
 bot.command('help', (ctx) => {
-    return ctx.replyWithMarkdownV2( 
-        `I understand these commands:\n` +
+    return ctx.reply(
+        `i understand these commands:\n\n` +
         `/start - start the bot\n` +
         `/help - show help\n` +
-        `/ping - check latency\n`
+        `/ping - check latency\n` +
+        `/createroom - create a new room\n` +
+        `/invite <roomId> @username - invite player to room`
     );
 });
 
-// /ping
+// /ping command
 bot.command('ping', async (ctx) => {
     const start = Date.now();
-    const sent = await ctx.reply('Pinging…');
+    const sent = await ctx.reply('pinging…');
     const latency = Date.now() - start;
+    const response = `pong! ${formatLatency(latency)}`;
+
     try {
-         await ctx.telegram.editMessageText(ctx.chat!.id, sent.message_id, undefined, `Pong! ${latency}ms`);
+        await ctx.telegram.editMessageText(
+            ctx.chat!.id,
+            sent.message_id,
+            undefined,
+            response
+        );
     } catch {
         // fallback if edit fails (private chats or permissions)
-        await ctx.reply(`Pong! ${latency}ms`);
+        await ctx.reply(response);
     }
 });
+
+// register room commands
+registerCreateRoom(bot);
+registerInvite(bot);
 
 // global error handler
 bot.catch((err, ctx) => {
     console.error(`global error for update ${ctx.updateType}`, err);
 });
 
-// start polling (recommended for dev / simple hosting)
+// start polling
 (async () => {
     try {
         await bot.launch();
-        console.log('Bot started (polling). Press Ctrl-C to stop.');
+        console.log('bot started (polling). press ctrl-c to stop.');
+
         // graceful stop
         process.once('SIGINT', () => bot.stop('SIGINT'));
         process.once('SIGTERM', () => bot.stop('SIGTERM'));
     } catch (err) {
-        console.error('Failed to launch bot:', err);
+        console.error('failed to launch bot:', err);
         process.exit(1);
     }
 })();

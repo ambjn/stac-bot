@@ -11,7 +11,7 @@ import {
     registerRemoveBuyIn,
     registerSummary
 } from './commands';
-import { rooms } from './state/rooms';
+import { getRoom, getPlayer, updatePlayerJoined } from './db';
 import { formatLatency } from './utils/format';
 
 const token = process.env.BOT_TOKEN;
@@ -33,7 +33,7 @@ bot.start((ctx) => {
     // handle join deep link
     if (payload?.startsWith('join_')) {
         const roomId = payload.replace('join_', '');
-        const room = rooms.get(roomId);
+        const room = getRoom(roomId);
 
         if (!room) {
             return ctx.reply(`❌ room not found.\n\nhey ${name}👋 i'm stac🎯\ntype /help to see commands.`);
@@ -48,7 +48,7 @@ bot.start((ctx) => {
         }
 
         // check if user was invited
-        const player = room.players.find(p => p.userId === userId || p.username === username);
+        const player = getPlayer(roomId, userId, username);
 
         if (!player) {
             return ctx.reply(`❌ you were not invited to room ${roomId}.`);
@@ -59,8 +59,7 @@ bot.start((ctx) => {
         }
 
         // mark as joined
-        player.joined = true;
-        player.userId = userId;
+        updatePlayerJoined(roomId, player.username, userId);
 
         return ctx.reply(
             `✅ welcome ${name}! you joined room ${roomId}\n\n` +

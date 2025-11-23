@@ -1,6 +1,5 @@
 import { Context, Telegraf } from 'telegraf';
-import { rooms } from '../state/rooms';
-import { Room } from '../state/types';
+import { createRoom } from '../db';
 import { generateRoomId } from '../utils/format';
 
 export const registerCreateRoom = (bot: Telegraf<Context>) => {
@@ -9,15 +8,11 @@ export const registerCreateRoom = (bot: Telegraf<Context>) => {
         const ownerId = ctx.from!.id;
         const ownerUsername = ctx.from!.username ?? ctx.from!.first_name ?? 'unknown';
 
-        const room: Room = {
+        createRoom({
             id: roomId,
             ownerId,
-            ownerUsername,
-            players: [],
-            createdAt: new Date()
-        };
-
-        rooms.set(roomId, room);
+            ownerUsername
+        });
 
         ctx.reply(
             `🎉 room created: ${roomId}\n\n` +

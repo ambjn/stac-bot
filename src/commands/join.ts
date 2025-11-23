@@ -1,5 +1,5 @@
 import { Context, Telegraf } from 'telegraf';
-import { rooms } from '../state/rooms';
+import { getRoom, getPlayer, updatePlayerJoined } from '../db';
 import { parseCommandArgs } from '../utils/parse';
 
 export const registerJoin = (bot: Telegraf<Context>) => {
@@ -12,7 +12,7 @@ export const registerJoin = (bot: Telegraf<Context>) => {
             return ctx.reply('usage: /join <roomId>');
         }
 
-        const room = rooms.get(roomId);
+        const room = getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -26,7 +26,7 @@ export const registerJoin = (bot: Telegraf<Context>) => {
         }
 
         // check if user was invited
-        const player = room.players.find(p => p.userId === userId || p.username === username);
+        const player = getPlayer(roomId, userId, username);
 
         if (!player) {
             return ctx.reply('❌ you were not invited to this room.');
@@ -36,9 +36,8 @@ export const registerJoin = (bot: Telegraf<Context>) => {
             return ctx.reply('ℹ️ you already joined this room.');
         }
 
-        // mark as joined and update userId if needed
-        player.joined = true;
-        player.userId = userId;
+        // mark as joined
+        updatePlayerJoined(roomId, player.username, userId);
 
         ctx.reply(`✅ you joined room ${roomId}!\n\nuse /room ${roomId} to see room details.`);
     });

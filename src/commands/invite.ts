@@ -1,5 +1,5 @@
 import { Context, Telegraf } from 'telegraf';
-import { rooms } from '../state/rooms';
+import { getRoom, addPlayer, getPlayerByUsername } from '../db';
 import { parseCommandArgs, parseUsername } from '../utils/parse';
 
 export const registerInvite = (bot: Telegraf<Context>) => {
@@ -12,7 +12,7 @@ export const registerInvite = (bot: Telegraf<Context>) => {
             return ctx.reply('usage: /invite <roomId> @username');
         }
 
-        const room = rooms.get(roomId);
+        const room = getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -25,17 +25,16 @@ export const registerInvite = (bot: Telegraf<Context>) => {
         const username = parseUsername(rawUser);
 
         // check if already invited
-        const existing = room.players.find(p => p.username === username);
+        const existing = getPlayerByUsername(roomId, username);
         if (existing) {
             return ctx.reply(`ℹ️ @${username} is already invited to this room.`);
         }
 
-        room.players.push({
+        addPlayer(roomId, {
             userId: 0, // will be set when they join
             username,
             buyIn: 0,
-            joined: false,
-            history: []
+            joined: false
         });
 
         // get bot username for deep link

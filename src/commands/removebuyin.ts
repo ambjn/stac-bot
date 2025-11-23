@@ -1,5 +1,5 @@
 import { Context, Telegraf } from 'telegraf';
-import { rooms } from '../state/rooms';
+import { getRoom, getPlayer, updatePlayerBuyIn } from '../db';
 import { parseCommandArgs } from '../utils/parse';
 import { formatCurrency } from '../utils/format';
 
@@ -18,7 +18,7 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
             return ctx.reply('❌ amount must be a positive number.');
         }
 
-        const room = rooms.get(roomId);
+        const room = getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -28,7 +28,7 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
 
         // check if user is owner or player
         const isOwner = room.ownerId === userId;
-        const player = room.players.find(p => p.userId === userId || p.username === username);
+        const player = getPlayer(roomId, userId, username);
 
         if (!isOwner && !player) {
             return ctx.reply('❌ you are not a member of this room.');
@@ -38,36 +38,28 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
             return ctx.reply('❌ you need to join the room first.');
         }
 
-        // get the target player record
-        let targetPlayer = player;
-        if (isOwner && !player) {
-            targetPlayer = room.players.find(p => p.userId === userId);
-        }
+        // check if user has any buy-in
+        const targetUsername = isOwner ? room.ownerUsername : player!.username;
+        const currentPlayer = getPlayer(roomId, userId, targetUsername);
 
-        if (!targetPlayer) {
+        if (!currentPlayer || currentPlayer.buyIn === 0) {
             return ctx.reply('❌ you have no buy-in to remove.');
         }
 
-        // validate no negative totals
-        if (targetPlayer.buyIn < amount) {
+        // update buy-in
+        const result = updatePlayerBuyIn(roomId, userId, targetUsername, amount, 'remove');
+
+        if (!result.success) {
             return ctx.reply(
                 `❌ cannot remove ${formatCurrency(amount)}.\n\n` +
-                `your current buy-in is ${formatCurrency(targetPlayer.buyIn)}.`
+                `your current buy-in is ${formatCurrency(currentPlayer.buyIn)}.`
             );
         }
 
-        // remove buy-in
-        targetPlayer.buyIn -= amount;
-        targetPlayer.history.push({
-            amount,
-            action: 'remove',
-            timestamp: new Date()
-        });
-
         ctx.reply(
             `💸 removed ${formatCurrency(amount)} buy-in\n\n` +
-            `👤 @${targetPlayer.username}\n` +
-            `📊 total: ${formatCurrency(targetPlayer.buyIn)}`
+            `👤 @${targetUsername}\n` +
+            `📊 total: ${formatCurrency(result.newTotal)}`
         );
     });
 };

@@ -1,5 +1,5 @@
 import { Context, Telegraf } from 'telegraf';
-import { rooms } from '../state/rooms';
+import { getRoom, getPlayer } from '../db';
 import { parseCommandArgs } from '../utils/parse';
 import { formatCurrency } from '../utils/format';
 
@@ -13,7 +13,7 @@ export const registerSummary = (bot: Telegraf<Context>) => {
             return ctx.reply('usage: /summary <roomId>');
         }
 
-        const room = rooms.get(roomId);
+        const room = getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -23,11 +23,9 @@ export const registerSummary = (bot: Telegraf<Context>) => {
 
         // check access
         const isOwner = room.ownerId === userId;
-        const isPlayer = room.players.some(p =>
-            (p.userId === userId || p.username === username) && p.joined
-        );
+        const player = getPlayer(roomId, userId, username);
 
-        if (!isOwner && !isPlayer) {
+        if (!isOwner && (!player || !player.joined)) {
             return ctx.reply('❌ you don\'t have access to this room.');
         }
 

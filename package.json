@@ -10,10 +10,12 @@
     "lint": "echo \"add linter if you want\""
   },
   "dependencies": {
+    "better-sqlite3": "^12.4.6",
     "dotenv": "^16.0.0",
     "telegraf": "^4.12.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.0.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.0.0"

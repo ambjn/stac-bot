@@ -1,0 +1,21 @@
+{
+  "name": "ts-telegram-bot",
+  "version": "1.0.0",
+  "main": "dist/bot.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/bot.ts",
+    "build": "tsc -p .",
+    "start": "node dist/bot.js",
+    "lint": "echo \"add linter if you want\""
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "telegraf": "^4.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.0"
+  }
+}

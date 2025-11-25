@@ -12,4 +12,4 @@ services:
       - key: SUPABASE_ANON_KEY
         sync: false
       - key: PORT
-        value: 10000
+        value: 5000

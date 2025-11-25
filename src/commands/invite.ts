@@ -12,7 +12,7 @@ export const registerInvite = (bot: Telegraf<Context>) => {
             return ctx.reply('usage: /invite <roomId> @username');
         }
 
-        const room = getRoom(roomId);
+        const room = await getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -25,12 +25,12 @@ export const registerInvite = (bot: Telegraf<Context>) => {
         const username = parseUsername(rawUser);
 
         // check if already invited
-        const existing = getPlayerByUsername(roomId, username);
+        const existing = await getPlayerByUsername(roomId, username);
         if (existing) {
             return ctx.reply(`ℹ️ @${username} is already invited to this room.`);
         }
 
-        addPlayer(roomId, {
+        await addPlayer(roomId, {
             userId: 0, // will be set when they join
             username,
             buyIn: 0,

@@ -4,7 +4,7 @@ import { parseCommandArgs } from '../utils/parse';
 import { formatCurrency } from '../utils/format';
 
 export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
-    bot.command('removebuyin', (ctx) => {
+    bot.command('removebuyin', async (ctx) => {
         const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
         const args = parseCommandArgs(text);
         const [roomId, amountStr] = args;
@@ -18,7 +18,7 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
             return ctx.reply('❌ amount must be a positive number.');
         }
 
-        const room = getRoom(roomId);
+        const room = await getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -28,7 +28,7 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
 
         // check if user is owner or player
         const isOwner = room.ownerId === userId;
-        const player = getPlayer(roomId, userId, username);
+        const player = await getPlayer(roomId, userId, username);
 
         if (!isOwner && !player) {
             return ctx.reply('❌ you are not a member of this room.');
@@ -40,14 +40,14 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
 
         // check if user has any buy-in
         const targetUsername = isOwner ? room.ownerUsername : player!.username;
-        const currentPlayer = getPlayer(roomId, userId, targetUsername);
+        const currentPlayer = await getPlayer(roomId, userId, targetUsername);
 
         if (!currentPlayer || currentPlayer.buyIn === 0) {
             return ctx.reply('❌ you have no buy-in to remove.');
         }
 
         // update buy-in
-        const result = updatePlayerBuyIn(roomId, userId, targetUsername, amount, 'remove');
+        const result = await updatePlayerBuyIn(roomId, userId, targetUsername, amount, 'remove');
 
         if (!result.success) {
             return ctx.reply(

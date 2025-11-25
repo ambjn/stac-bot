@@ -4,7 +4,7 @@ import { parseCommandArgs } from '../utils/parse';
 import { formatCurrency } from '../utils/format';
 
 export const registerSummary = (bot: Telegraf<Context>) => {
-    bot.command('summary', (ctx) => {
+    bot.command('summary', async (ctx) => {
         const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
         const args = parseCommandArgs(text);
         const [roomId] = args;
@@ -13,7 +13,7 @@ export const registerSummary = (bot: Telegraf<Context>) => {
             return ctx.reply('usage: /summary <roomId>');
         }
 
-        const room = getRoom(roomId);
+        const room = await getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -23,7 +23,7 @@ export const registerSummary = (bot: Telegraf<Context>) => {
 
         // check access
         const isOwner = room.ownerId === userId;
-        const player = getPlayer(roomId, userId, username);
+        const player = await getPlayer(roomId, userId, username);
 
         if (!isOwner && (!player || !player.joined)) {
             return ctx.reply('❌ you don\'t have access to this room.');

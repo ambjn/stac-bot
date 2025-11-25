@@ -4,7 +4,7 @@ import { parseCommandArgs } from '../utils/parse';
 import { formatCurrency } from '../utils/format';
 
 export const registerSettle = (bot: Telegraf<Context>) => {
-    bot.command('settle', (ctx) => {
+    bot.command('settle', async (ctx) => {
         const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
         const args = parseCommandArgs(text);
         const [roomId] = args;
@@ -13,7 +13,7 @@ export const registerSettle = (bot: Telegraf<Context>) => {
             return ctx.reply('usage: /settle <roomId>');
         }
 
-        const room = getRoom(roomId);
+        const room = await getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -23,14 +23,14 @@ export const registerSettle = (bot: Telegraf<Context>) => {
 
         // check access
         const isOwner = room.ownerId === userId;
-        const player = getPlayer(roomId, userId, username);
+        const player = await getPlayer(roomId, userId, username);
 
         if (!isOwner && (!player || !player.joined)) {
             return ctx.reply('❌ you don\'t have access to this room.');
         }
 
         // calculate settlement
-        const settlement = calculateSettlement(roomId);
+        const settlement = await calculateSettlement(roomId);
         if (!settlement) {
             return ctx.reply('❌ failed to calculate settlement.');
         }
@@ -110,7 +110,7 @@ export const registerSettle = (bot: Telegraf<Context>) => {
 
         // mark as settled if owner
         if (isOwner && !room.settled) {
-            setRoomSettled(roomId, true);
+            await setRoomSettled(roomId, true);
             lines.push(`✅ room marked as settled.`);
         }
 

@@ -4,7 +4,7 @@ import { parseCommandArgs } from '../utils/parse';
 import { formatCurrency } from '../utils/format';
 
 export const registerCashOut = (bot: Telegraf<Context>) => {
-    bot.command('cashout', (ctx) => {
+    bot.command('cashout', async (ctx) => {
         const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
         const args = parseCommandArgs(text);
         const [roomId, amountStr] = args;
@@ -18,7 +18,7 @@ export const registerCashOut = (bot: Telegraf<Context>) => {
             return ctx.reply('❌ amount must be a non-negative number.');
         }
 
-        const room = getRoom(roomId);
+        const room = await getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -32,7 +32,7 @@ export const registerCashOut = (bot: Telegraf<Context>) => {
 
         // check if user is owner or player
         const isOwner = room.ownerId === userId;
-        const player = getPlayer(roomId, userId, username);
+        const player = await getPlayer(roomId, userId, username);
 
         if (!isOwner && !player) {
             return ctx.reply('❌ you are not a member of this room.');
@@ -44,14 +44,14 @@ export const registerCashOut = (bot: Telegraf<Context>) => {
 
         // update cash out
         const targetUsername = isOwner ? room.ownerUsername : player!.username;
-        const result = updatePlayerCashOut(roomId, userId, targetUsername, amount);
+        const result = await updatePlayerCashOut(roomId, userId, targetUsername, amount);
 
         if (!result.success) {
             return ctx.reply(`❌ ${result.error}`);
         }
 
         // get updated player info
-        const updatedPlayer = getPlayer(roomId, userId, targetUsername);
+        const updatedPlayer = await getPlayer(roomId, userId, targetUsername);
         const pnl = amount - (updatedPlayer?.buyIn ?? 0);
         const pnlStr = pnl >= 0 ? `+${formatCurrency(pnl)}` : `-${formatCurrency(Math.abs(pnl))}`;
         const pnlEmoji = pnl >= 0 ? '📈' : '📉';

@@ -1,176 +1,225 @@
-import { db } from './connection';
+import { supabase } from './connection';
 import { Room, Player, BuyInEntry, Settlement, PlayerPnL, RoomSettlement } from '../state/types';
 
 // room operations
-export const createRoom = (room: Omit<Room, 'players' | 'createdAt' | 'settled'>): Room => {
-    const stmt = db.prepare(`
-        INSERT INTO rooms (id, owner_id, owner_username)
-        VALUES (?, ?, ?)
-    `);
-    stmt.run(room.id, room.ownerId, room.ownerUsername);
+export const createRoom = async (room: Omit<Room, 'players' | 'createdAt' | 'settled'>): Promise<Room> => {
+    const { data, error } = await supabase
+        .from('rooms')
+        .insert({
+            id: room.id,
+            owner_id: room.ownerId,
+            owner_username: room.ownerUsername,
+            settled: false
+        })
+        .select()
+        .single();
+
+    if (error) throw new Error(`Failed to create room: ${error.message}`);
 
     return {
         ...room,
         players: [],
-        createdAt: new Date(),
+        createdAt: new Date(data.created_at),
         settled: false
     };
 };
 
-export const getRoom = (roomId: string): Room | null => {
-    const roomRow = db.prepare(`
-        SELECT id, owner_id, owner_username, settled, created_at
-        FROM rooms WHERE id = ?
-    `).get(roomId) as any;
+export const getRoom = async (roomId: string): Promise<Room | null> => {
+    const { data: roomData, error: roomError } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('id', roomId)
+        .single();
 
-    if (!roomRow) return null;
+    if (roomError || !roomData) return null;
 
-    const players = getPlayers(roomId);
+    const players = await getPlayers(roomId);
 
     return {
-        id: roomRow.id,
-        ownerId: roomRow.owner_id,
-        ownerUsername: roomRow.owner_username,
+        id: roomData.id,
+        ownerId: roomData.owner_id,
+        ownerUsername: roomData.owner_username,
         players,
-        createdAt: new Date(roomRow.created_at),
-        settled: roomRow.settled === 1
+        createdAt: new Date(roomData.created_at),
+        settled: roomData.settled
     };
 };
 
-export const deleteRoom = (roomId: string): boolean => {
-    const result = db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId);
-    return result.changes > 0;
+export const deleteRoom = async (roomId: string): Promise<boolean> => {
+    const { error } = await supabase
+        .from('rooms')
+        .delete()
+        .eq('id', roomId);
+
+    return !error;
 };
 
-export const setRoomSettled = (roomId: string, settled: boolean): void => {
-    db.prepare('UPDATE rooms SET settled = ? WHERE id = ?').run(settled ? 1 : 0, roomId);
+export const setRoomSettled = async (roomId: string, settled: boolean): Promise<void> => {
+    await supabase
+        .from('rooms')
+        .update({ settled })
+        .eq('id', roomId);
 };
 
-export const getRoomsByUser = (userId: number, username: string): { id: string; role: string }[] => {
+export const getRoomsByUser = async (userId: number, username: string): Promise<{ id: string; role: string }[]> => {
     const rooms: { id: string; role: string }[] = [];
 
     // rooms owned by user
-    const owned = db.prepare(`
-        SELECT id FROM rooms WHERE owner_id = ?
-    `).all(userId) as any[];
-    owned.forEach(r => rooms.push({ id: r.id, role: '👑 owner' }));
+    const { data: ownedRooms } = await supabase
+        .from('rooms')
+        .select('id')
+        .eq('owner_id', userId);
+
+    if (ownedRooms) {
+        ownedRooms.forEach((r: any) => rooms.push({ id: r.id, role: '👑 owner' }));
+    }
 
     // rooms user is a player in
-    const playing = db.prepare(`
-        SELECT DISTINCT room_id FROM players
-        WHERE (user_id = ? OR username = ?) AND joined = 1
-    `).all(userId, username) as any[];
-    playing.forEach(r => {
-        if (!rooms.some(x => x.id === r.room_id)) {
-            rooms.push({ id: r.room_id, role: '👤 player' });
-        }
-    });
+    const { data: playingRooms } = await supabase
+        .from('players')
+        .select('room_id')
+        .or(`user_id.eq.${userId},username.eq.${username}`)
+        .eq('joined', true);
+
+    if (playingRooms) {
+        playingRooms.forEach((r: any) => {
+            if (!rooms.some(x => x.id === r.room_id)) {
+                rooms.push({ id: r.room_id, role: '👤 player' });
+            }
+        });
+    }
 
     return rooms;
 };
 
 // player operations
-export const addPlayer = (roomId: string, player: Omit<Player, 'history' | 'cashOut'>): void => {
-    const stmt = db.prepare(`
-        INSERT INTO players (room_id, user_id, username, buy_in, cash_out, joined)
-        VALUES (?, ?, ?, ?, 0, ?)
-    `);
-    stmt.run(roomId, player.userId, player.username, player.buyIn, player.joined ? 1 : 0);
+export const addPlayer = async (roomId: string, player: Omit<Player, 'history' | 'cashOut'>): Promise<void> => {
+    await supabase
+        .from('players')
+        .insert({
+            room_id: roomId,
+            user_id: player.userId,
+            username: player.username,
+            buy_in: player.buyIn,
+            cash_out: 0,
+            joined: player.joined
+        });
 };
 
-export const getPlayer = (roomId: string, userId: number, username: string): Player | null => {
-    const row = db.prepare(`
-        SELECT id, user_id, username, buy_in, cash_out, joined
-        FROM players
-        WHERE room_id = ? AND (user_id = ? OR username = ?)
-        LIMIT 1
-    `).get(roomId, userId, username) as any;
+export const getPlayer = async (roomId: string, userId: number, username: string): Promise<Player | null> => {
+    const { data, error } = await supabase
+        .from('players')
+        .select('*')
+        .eq('room_id', roomId)
+        .or(`user_id.eq.${userId},username.eq.${username}`)
+        .limit(1)
+        .single();
 
-    if (!row) return null;
+    if (error || !data) return null;
 
-    const history = getPlayerHistory(row.id);
+    const history = await getPlayerHistory(data.id);
 
     return {
-        userId: row.user_id,
-        username: row.username,
-        buyIn: row.buy_in,
-        cashOut: row.cash_out,
-        joined: row.joined === 1,
+        userId: data.user_id,
+        username: data.username,
+        buyIn: data.buy_in,
+        cashOut: data.cash_out,
+        joined: data.joined,
         history
     };
 };
 
-export const getPlayerByUsername = (roomId: string, username: string): Player | null => {
-    const row = db.prepare(`
-        SELECT id, user_id, username, buy_in, cash_out, joined
-        FROM players
-        WHERE room_id = ? AND username = ?
-    `).get(roomId, username) as any;
+export const getPlayerByUsername = async (roomId: string, username: string): Promise<Player | null> => {
+    const { data, error } = await supabase
+        .from('players')
+        .select('*')
+        .eq('room_id', roomId)
+        .eq('username', username)
+        .single();
 
-    if (!row) return null;
+    if (error || !data) return null;
 
-    const history = getPlayerHistory(row.id);
+    const history = await getPlayerHistory(data.id);
 
     return {
-        userId: row.user_id,
-        username: row.username,
-        buyIn: row.buy_in,
-        cashOut: row.cash_out,
-        joined: row.joined === 1,
+        userId: data.user_id,
+        username: data.username,
+        buyIn: data.buy_in,
+        cashOut: data.cash_out,
+        joined: data.joined,
         history
     };
 };
 
-export const getPlayers = (roomId: string): Player[] => {
-    const rows = db.prepare(`
-        SELECT id, user_id, username, buy_in, cash_out, joined
-        FROM players WHERE room_id = ?
-        ORDER BY buy_in DESC
-    `).all(roomId) as any[];
+export const getPlayers = async (roomId: string): Promise<Player[]> => {
+    const { data, error } = await supabase
+        .from('players')
+        .select('*')
+        .eq('room_id', roomId)
+        .order('buy_in', { ascending: false });
 
-    return rows.map(row => ({
-        userId: row.user_id,
-        username: row.username,
-        buyIn: row.buy_in,
-        cashOut: row.cash_out,
-        joined: row.joined === 1,
-        history: getPlayerHistory(row.id)
-    }));
+    if (error || !data) return [];
+
+    const players = await Promise.all(
+        data.map(async (row: any) => ({
+            userId: row.user_id,
+            username: row.username,
+            buyIn: row.buy_in,
+            cashOut: row.cash_out,
+            joined: row.joined,
+            history: await getPlayerHistory(row.id)
+        }))
+    );
+
+    return players;
 };
 
-export const updatePlayerJoined = (roomId: string, username: string, userId: number): void => {
-    db.prepare(`
-        UPDATE players SET joined = 1, user_id = ?
-        WHERE room_id = ? AND username = ?
-    `).run(userId, roomId, username);
+export const updatePlayerJoined = async (roomId: string, username: string, userId: number): Promise<void> => {
+    await supabase
+        .from('players')
+        .update({ joined: true, user_id: userId })
+        .eq('room_id', roomId)
+        .eq('username', username);
 };
 
-export const updatePlayerBuyIn = (
+export const updatePlayerBuyIn = async (
     roomId: string,
     userId: number,
     username: string,
     amount: number,
     action: 'add' | 'remove'
-): { success: boolean; newTotal: number; error?: string } => {
+): Promise<{ success: boolean; newTotal: number; error?: string }> => {
     // get or create player record
-    let playerRow = db.prepare(`
-        SELECT id, buy_in FROM players
-        WHERE room_id = ? AND (user_id = ? OR username = ?)
-    `).get(roomId, userId, username) as any;
+    let { data: playerData, error: playerError } = await supabase
+        .from('players')
+        .select('*')
+        .eq('room_id', roomId)
+        .or(`user_id.eq.${userId},username.eq.${username}`)
+        .single();
 
-    if (!playerRow) {
+    if (playerError || !playerData) {
         // create player entry for owner
-        db.prepare(`
-            INSERT INTO players (room_id, user_id, username, buy_in, cash_out, joined)
-            VALUES (?, ?, ?, 0, 0, 1)
-        `).run(roomId, userId, username);
+        const { data: newPlayer, error: insertError } = await supabase
+            .from('players')
+            .insert({
+                room_id: roomId,
+                user_id: userId,
+                username: username,
+                buy_in: 0,
+                cash_out: 0,
+                joined: true
+            })
+            .select()
+            .single();
 
-        playerRow = db.prepare(`
-            SELECT id, buy_in FROM players WHERE room_id = ? AND user_id = ?
-        `).get(roomId, userId) as any;
+        if (insertError || !newPlayer) {
+            return { success: false, newTotal: 0, error: 'failed to create player' };
+        }
+
+        playerData = newPlayer;
     }
 
-    const currentBuyIn = playerRow.buy_in;
+    const currentBuyIn = playerData.buy_in;
     let newTotal: number;
 
     if (action === 'add') {
@@ -183,40 +232,53 @@ export const updatePlayerBuyIn = (
     }
 
     // update buy-in
-    db.prepare(`UPDATE players SET buy_in = ? WHERE id = ?`).run(newTotal, playerRow.id);
+    await supabase
+        .from('players')
+        .update({ buy_in: newTotal })
+        .eq('id', playerData.id);
 
     // log history
-    db.prepare(`
-        INSERT INTO buyin_history (room_id, player_id, amount, action)
-        VALUES (?, ?, ?, ?)
-    `).run(roomId, playerRow.id, amount, action);
+    await supabase
+        .from('buyin_history')
+        .insert({
+            room_id: roomId,
+            player_id: playerData.id,
+            amount,
+            action
+        });
 
     return { success: true, newTotal };
 };
 
 // cashout operations
-export const updatePlayerCashOut = (
+export const updatePlayerCashOut = async (
     roomId: string,
     userId: number,
     username: string,
     amount: number
-): { success: boolean; error?: string } => {
-    const playerRow = db.prepare(`
-        SELECT id FROM players
-        WHERE room_id = ? AND (user_id = ? OR username = ?)
-    `).get(roomId, userId, username) as any;
+): Promise<{ success: boolean; error?: string }> => {
+    const { data: playerData, error } = await supabase
+        .from('players')
+        .select('id')
+        .eq('room_id', roomId)
+        .or(`user_id.eq.${userId},username.eq.${username}`)
+        .single();
 
-    if (!playerRow) {
+    if (error || !playerData) {
         return { success: false, error: 'player not found' };
     }
 
-    db.prepare(`UPDATE players SET cash_out = ? WHERE id = ?`).run(amount, playerRow.id);
+    await supabase
+        .from('players')
+        .update({ cash_out: amount })
+        .eq('id', playerData.id);
+
     return { success: true };
 };
 
 // settlement calculations
-export const calculateSettlement = (roomId: string): RoomSettlement | null => {
-    const room = getRoom(roomId);
+export const calculateSettlement = async (roomId: string): Promise<RoomSettlement | null> => {
+    const room = await getRoom(roomId);
     if (!room) return null;
 
     const activePlayers = room.players.filter(p => p.joined || p.buyIn > 0);
@@ -286,14 +348,16 @@ const calculateOptimalSettlements = (players: PlayerPnL[]): Settlement[] => {
 };
 
 // history operations
-export const getPlayerHistory = (playerId: number): BuyInEntry[] => {
-    const rows = db.prepare(`
-        SELECT amount, action, timestamp
-        FROM buyin_history WHERE player_id = ?
-        ORDER BY timestamp DESC
-    `).all(playerId) as any[];
+export const getPlayerHistory = async (playerId: number): Promise<BuyInEntry[]> => {
+    const { data, error } = await supabase
+        .from('buyin_history')
+        .select('*')
+        .eq('player_id', playerId)
+        .order('timestamp', { ascending: false });
 
-    return rows.map(row => ({
+    if (error || !data) return [];
+
+    return data.map((row: any) => ({
         amount: row.amount,
         action: row.action as 'add' | 'remove',
         timestamp: new Date(row.timestamp)

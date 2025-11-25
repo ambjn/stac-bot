@@ -155,7 +155,7 @@ bot.catch((err, ctx) => {
 });
 
 // create http server for health checks
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || '5000', 10);
 const server = http.createServer((req, res) => {
     if (req.url === '/health' || req.url === '/') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -172,7 +172,7 @@ const server = http.createServer((req, res) => {
         await bot.launch();
         console.log('bot started (polling). press ctrl-c to stop.');
 
-        server.listen(PORT, () => {
+        server.listen(PORT, '0.0.0.0', () => {
             console.log(`http server listening on port ${PORT}`);
         });
 

@@ -13,7 +13,7 @@ import {
     registerCashOut,
     registerSettle
 } from './commands';
-import { getRoom, getPlayer, updatePlayerJoined } from './db';
+import { getRoom, getPlayer, updatePlayerJoined, registerUser } from './db';
 import { formatLatency } from './utils/format';
 
 const token = process.env.BOT_TOKEN;
@@ -31,6 +31,21 @@ bot.use(loggingMiddleware);
 bot.start(async (ctx) => {
     const name = ctx.from?.first_name ?? 'there';
     const payload = ctx.payload; // e.g. "join_abc123"
+
+    // Register or update user in database
+    if (ctx.from) {
+        try {
+            await registerUser(
+                ctx.from.id,
+                ctx.from.username,
+                ctx.from.first_name,
+                ctx.from.last_name
+            );
+        } catch (err) {
+            console.error('Failed to register user:', err);
+            // Continue execution even if user registration fails
+        }
+    }
 
     // handle join deep link
     if (payload?.startsWith('join_')) {

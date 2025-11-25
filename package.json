@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/bot.ts",
     "build": "tsc -p .",
-    "start": "node dist/bot.js",
+    "start": "node ./dist/bot.js",
     "lint": "echo \"add linter if you want\""
   },
   "dependencies": {

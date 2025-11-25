@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { Telegraf, Context } from 'telegraf';
+import * as http from 'http';
 import { loggingMiddleware } from './middleware/logging';
 import {
     registerCreateRoom,
@@ -153,15 +154,40 @@ bot.catch((err, ctx) => {
     console.error(`global error for update ${ctx.updateType}`, err);
 });
 
-// start polling
+// create http server for health checks
+const PORT = process.env.PORT || 3000;
+const server = http.createServer((req, res) => {
+    if (req.url === '/health' || req.url === '/') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', bot: 'running' }));
+    } else {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'not found' }));
+    }
+});
+
+// start polling and http server
 (async () => {
     try {
         await bot.launch();
         console.log('bot started (polling). press ctrl-c to stop.');
 
+        server.listen(PORT, () => {
+            console.log(`http server listening on port ${PORT}`);
+        });
+
         // graceful stop
-        process.once('SIGINT', () => bot.stop('SIGINT'));
-        process.once('SIGTERM', () => bot.stop('SIGTERM'));
+        const shutdown = () => {
+            console.log('shutting down...');
+            bot.stop('SIGTERM');
+            server.close(() => {
+                console.log('http server closed');
+                process.exit(0);
+            });
+        };
+
+        process.once('SIGINT', shutdown);
+        process.once('SIGTERM', shutdown);
     } catch (err) {
         console.error('failed to launch bot:', err);
         process.exit(1);

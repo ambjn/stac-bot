@@ -1,5 +1,5 @@
 services:
-  - type: worker
+  - type: web
     name: stac-bot
     runtime: node
     buildCommand: npm install && npm run build
@@ -11,3 +11,5 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+      - key: PORT
+        value: 10000

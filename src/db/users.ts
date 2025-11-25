@@ -100,6 +100,28 @@ export const getUser = async (userId: number): Promise<User | null> => {
 };
 
 /**
+ * Get user by username
+ */
+export const getUserByUsername = async (username: string): Promise<User | null> => {
+    const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .single();
+
+    if (error || !data) return null;
+
+    return {
+        userId: data.user_id,
+        username: data.username,
+        firstName: data.first_name,
+        lastName: data.last_name,
+        createdAt: new Date(data.created_at),
+        lastSeen: new Date(data.last_seen)
+    };
+};
+
+/**
  * Get all registered users
  */
 export const getAllUsers = async (): Promise<User[]> => {

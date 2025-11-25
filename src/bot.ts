@@ -155,7 +155,7 @@ bot.catch((err, ctx) => {
 });
 
 // create http server for health checks
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 const server = http.createServer((req, res) => {
     if (req.url === '/health' || req.url === '/') {
         res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -3,7 +3,7 @@ import { getRoom, getPlayer } from '../db';
 import { parseCommandArgs } from '../utils/parse';
 
 export const registerRoom = (bot: Telegraf<Context>) => {
-    bot.command('room', (ctx) => {
+    bot.command('room', async (ctx) => {
         const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
         const args = parseCommandArgs(text);
         const [roomId] = args;
@@ -12,7 +12,7 @@ export const registerRoom = (bot: Telegraf<Context>) => {
             return ctx.reply('usage: /room <roomId>');
         }
 
-        const room = getRoom(roomId);
+        const room = await getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -22,7 +22,7 @@ export const registerRoom = (bot: Telegraf<Context>) => {
 
         // check if user has access to this room
         const isOwner = room.ownerId === userId;
-        const player = getPlayer(roomId, userId, username);
+        const player = await getPlayer(roomId, userId, username);
 
         if (!isOwner && !player) {
             return ctx.reply('❌ you don\'t have access to this room.');

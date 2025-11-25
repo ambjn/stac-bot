@@ -2,11 +2,11 @@ import { Context, Telegraf } from 'telegraf';
 import { getRoomsByUser } from '../db';
 
 export const registerMyRooms = (bot: Telegraf<Context>) => {
-    bot.command('myrooms', (ctx) => {
+    bot.command('myrooms', async (ctx) => {
         const userId = ctx.from!.id;
         const username = ctx.from!.username ?? ctx.from!.first_name ?? 'unknown';
 
-        const userRooms = getRoomsByUser(userId, username);
+        const userRooms = await getRoomsByUser(userId, username);
 
         if (userRooms.length === 0) {
             return ctx.reply('you have no rooms yet.\n\nuse /createroom to create one!');

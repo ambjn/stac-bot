@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(git log:*)",
+      "Bash(cat:*)",
+      "WebSearch",
+      "WebFetch(domain:www.moonpay.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.quicknode.com)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

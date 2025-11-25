@@ -3,7 +3,7 @@ import { getRoom, getPlayer, updatePlayerJoined } from '../db';
 import { parseCommandArgs } from '../utils/parse';
 
 export const registerJoin = (bot: Telegraf<Context>) => {
-    bot.command('join', (ctx) => {
+    bot.command('join', async (ctx) => {
         const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
         const args = parseCommandArgs(text);
         const [roomId] = args;
@@ -12,7 +12,7 @@ export const registerJoin = (bot: Telegraf<Context>) => {
             return ctx.reply('usage: /join <roomId>');
         }
 
-        const room = getRoom(roomId);
+        const room = await getRoom(roomId);
         if (!room) {
             return ctx.reply('❌ room not found.');
         }
@@ -26,7 +26,7 @@ export const registerJoin = (bot: Telegraf<Context>) => {
         }
 
         // check if user was invited
-        const player = getPlayer(roomId, userId, username);
+        const player = await getPlayer(roomId, userId, username);
 
         if (!player) {
             return ctx.reply('❌ you were not invited to this room.');
@@ -37,7 +37,7 @@ export const registerJoin = (bot: Telegraf<Context>) => {
         }
 
         // mark as joined
-        updatePlayerJoined(roomId, player.username, userId);
+        await updatePlayerJoined(roomId, player.username, userId);
 
         ctx.reply(`✅ you joined room ${roomId}!\n\nuse /room ${roomId} to see room details.`);
     });

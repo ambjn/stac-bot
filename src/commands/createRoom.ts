@@ -3,12 +3,12 @@ import { createRoom } from '../db';
 import { generateRoomId } from '../utils/format';
 
 export const registerCreateRoom = (bot: Telegraf<Context>) => {
-    bot.command('createroom', (ctx) => {
+    bot.command('createroom', async (ctx) => {
         const roomId = generateRoomId();
         const ownerId = ctx.from!.id;
         const ownerUsername = ctx.from!.username ?? ctx.from!.first_name ?? 'unknown';
 
-        createRoom({
+        await createRoom({
             id: roomId,
             ownerId,
             ownerUsername

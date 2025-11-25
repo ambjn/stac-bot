@@ -5,6 +5,7 @@ export interface User {
     username?: string;
     firstName?: string;
     lastName?: string;
+    solanaWalletAddress?: string;
     createdAt: Date;
     lastSeen: Date;
 }
@@ -48,6 +49,7 @@ export const registerUser = async (
             username: data.username,
             firstName: data.first_name,
             lastName: data.last_name,
+            solanaWalletAddress: data.solana_wallet_address,
             createdAt: new Date(data.created_at),
             lastSeen: new Date(data.last_seen)
         };
@@ -71,6 +73,7 @@ export const registerUser = async (
             username: data.username,
             firstName: data.first_name,
             lastName: data.last_name,
+            solanaWalletAddress: data.solana_wallet_address,
             createdAt: new Date(data.created_at),
             lastSeen: new Date(data.last_seen)
         };
@@ -152,4 +155,51 @@ export const getUserCount = async (): Promise<number> => {
 
     if (error) return 0;
     return count ?? 0;
+};
+
+/**
+ * Set or update user's Solana wallet address
+ */
+export const setUserWalletAddress = async (
+    userId: number,
+    walletAddress: string
+): Promise<User | null> => {
+    const { data, error } = await supabase
+        .from('users')
+        .update({
+            solana_wallet_address: walletAddress,
+            last_seen: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+    if (error || !data) {
+        console.error('Failed to update wallet address:', error);
+        return null;
+    }
+
+    return {
+        userId: data.user_id,
+        username: data.username,
+        firstName: data.first_name,
+        lastName: data.last_name,
+        solanaWalletAddress: data.solana_wallet_address,
+        createdAt: new Date(data.created_at),
+        lastSeen: new Date(data.last_seen)
+    };
+};
+
+/**
+ * Get user's Solana wallet address
+ */
+export const getUserWalletAddress = async (userId: number): Promise<string | null> => {
+    const { data, error } = await supabase
+        .from('users')
+        .select('solana_wallet_address')
+        .eq('user_id', userId)
+        .single();
+
+    if (error || !data) return null;
+    return data.solana_wallet_address || null;
 };

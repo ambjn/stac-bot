@@ -1,7 +1,13 @@
 import { Context, Telegraf } from 'telegraf';
+import { Markup } from 'telegraf';
 import { getRoom, getPlayer, calculateSettlement, setRoomSettled } from '../db';
+import { getUserByUsername, getUserWalletAddress } from '../db/users';
 import { parseCommandArgs } from '../utils/parse';
 import { formatCurrency } from '../utils/format';
+import { PublicKey } from '@solana/web3.js';
+import { encodeURL } from '@solana/pay';
+import BigNumber from 'bignumber.js';
+import QRCode from 'qrcode';
 
 export const registerSettle = (bot: Telegraf<Context>) => {
     bot.command('settle', async (ctx) => {
@@ -114,6 +120,101 @@ export const registerSettle = (bot: Telegraf<Context>) => {
             lines.push(`✅ room marked as settled.`);
         }
 
-        ctx.reply(lines.join('\n'));
+        await ctx.reply(lines.join('\n'));
+
+        // USDC SPL Token mint address on Solana Mainnet
+        const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+
+        // Generate and send QR codes for settlements
+        for (const s of settlement.settlements) {
+            // Get the recipient's (winner's) wallet address
+            const recipientUser = await getUserByUsername(s.to);
+            if (!recipientUser) continue;
+
+            const recipientWallet = await getUserWalletAddress(recipientUser.userId);
+            if (!recipientWallet) {
+                // Notify that recipient needs to set wallet
+                await ctx.reply(
+                    `⚠️ *Wallet Not Set*\n\n` +
+                    `@${s.to} needs to set up their wallet to receive payments.\n\n` +
+                    `They should use: /setwallet <address>`,
+                    {
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([
+                            [Markup.button.callback('💬 Remind @' + s.to, `remind_wallet_${s.to}`)]
+                        ])
+                    }
+                );
+                continue;
+            }
+
+            // Get the payer's (loser's) user ID to send them the QR code
+            const payerUser = await getUserByUsername(s.from);
+            if (!payerUser) continue;
+
+            try {
+                const recipient = new PublicKey(recipientWallet);
+
+                // Create Solana Pay URL for USDC transfer
+                const url = encodeURL({
+                    recipient,
+                    amount: new BigNumber(s.amount),
+                    splToken: USDC_MINT,
+                    label: `STAC Settlement - Room ${roomId}`,
+                    message: `Settlement payment to @${s.to}`,
+                    memo: `STAC-${roomId}-${Date.now()}`,
+                });
+
+                const solanaUrl = url.toString();
+                const clickableUrl = `https://dial.to/?action=solana-action:${encodeURIComponent(solanaUrl)}`;
+
+                // Generate QR code with raw Solana Pay URL for wallet scanners
+                const qrBuffer = await QRCode.toBuffer(solanaUrl, {
+                    width: 512,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#FFFFFF'
+                    }
+                });
+
+                // Send QR code to the payer via DM
+                await bot.telegram.sendPhoto(
+                    payerUser.userId,
+                    { source: qrBuffer },
+                    {
+                        caption:
+                            `💸 *Settlement Payment Due*\n\n` +
+                            `*Room:* \`${roomId}\`\n` +
+                            `*Pay to:* @${s.to}\n` +
+                            `*Amount:* ₹${formatCurrency(s.amount)} (${s.amount} USDC)`,
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([
+                            [Markup.button.callback('✅ Mark as Paid', `mark_paid_${roomId}_${s.from}_${s.to}`)]
+                        ])
+                    }
+                );
+
+            } catch (err) {
+                console.error(`Error generating QR code for ${s.from} -> ${s.to}:`, err);
+                await ctx.reply(
+                    `❌ failed to generate payment QR for @${s.from} -> @${s.to}`
+                );
+            }
+        }
+
+        if (settlement.settlements.length > 0) {
+            await ctx.reply(
+                `📬 *Payment QR Codes Sent!*\n\n` +
+                `Payment QR codes have been sent via DM to users who owe money.\n\n` +
+                `💡 Check your private messages with the bot to complete payments.`,
+                {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.url('💬 Open Bot DM', `https://t.me/${bot.botInfo?.username || 'stac_bot'}`)]
+                    ])
+                }
+            );
+        }
     });
 };

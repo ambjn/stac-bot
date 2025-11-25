@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Telegraf, Context } from 'telegraf';
+import { Telegraf, Context, Markup } from 'telegraf';
 import * as http from 'http';
 import { loggingMiddleware } from './middleware/logging';
 import {
@@ -13,7 +13,8 @@ import {
     registerSummary,
     registerCashOut,
     registerSettle,
-    registerSolanaPay
+    registerStacPay,
+    registerSetWallet
 } from './commands';
 import { getRoom, getPlayer, updatePlayerJoined, registerUser } from './db';
 import { formatLatency } from './utils/format';
@@ -87,34 +88,46 @@ bot.start(async (ctx) => {
     }
 
     // default start message
-    return ctx.reply(`hey ${name}👋 i'm stac🎯\nyour smart settlement tool🪚\n\ntype /help to see commands.`);
+    return ctx.reply(
+        `👋 *Welcome ${name}!*\n\n` +
+        `I'm *STAC* 🎯 - Your Smart Settlement Tool\n\n` +
+        `I help you manage poker games, track buy-ins, and settle payments with crypto!`,
+        {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('📖 View Commands', 'show_help')],
+                [Markup.button.callback('🎯 Create Room', 'create_room_help')],
+                [Markup.button.callback('💳 Setup Wallet', 'setup_wallet_help')]
+            ])
+        }
+    );
 });
 
 // /help command
+const helpMessage =
+    `📚 *STAC Commands*\n\n` +
+    `*🎯 Rooms*\n` +
+    `/createroom - Create a new game room\n` +
+    `/invite <roomId> @user - Invite a player\n` +
+    `/join <roomId> - Join a room\n` +
+    `/room <roomId> - View room details\n` +
+    `/myrooms - List your rooms\n\n` +
+    `*💰 Buy-ins & Tracking*\n` +
+    `/addbuyin <roomId> <amount> - Add buy-in\n` +
+    `/removebuyin <roomId> <amount> - Remove buy-in\n` +
+    `/cashout <roomId> <amount> - Record final chips\n` +
+    `/summary <roomId> - View summary\n\n` +
+    `*🏆 Settlement*\n` +
+    `/settle <roomId> - Calculate & send payment QRs\n\n` +
+    `*💳 Wallet & Payments*\n` +
+    `/setwallet <address> - Set Solana wallet\n` +
+    `/stacpay <address> <amount> - Create payment QR\n\n` +
+    `*📋 General*\n` +
+    `/help - Show this help\n` +
+    `/ping - Check bot latency`;
+
 bot.command('help', (ctx) => {
-    return ctx.reply(
-        `i understand these commands:\n\n` +
-        `📋 general:\n` +
-        `/start - start the bot\n` +
-        `/help - show help\n` +
-        `/ping - check latency\n\n` +
-        `🎯 rooms:\n` +
-        `/createroom - create a new room\n` +
-        `/invite <roomId> @username - invite player\n` +
-        `/join <roomId> - join a room you're invited to\n` +
-        `/room <roomId> - view room details\n` +
-        `/myrooms - list your rooms\n\n` +
-        `💰 buy-ins:\n` +
-        `/addbuyin <roomId> <amount> - add buy-in\n` +
-        `/removebuyin <roomId> <amount> - remove buy-in\n` +
-        `/summary <roomId> - view room summary\n\n` +
-        `🏆 settlement:\n` +
-        `/cashout <roomId> <amount> - record final chips\n` +
-        `/settle <roomId> - calculate p&l and settlements\n\n` +
-        `💳 payments:\n` +
-        `/solanapay <address> <amount> - create USDC payment link\n` +
-        `/testpay - quick test payment (5 USDC)`
-    );
+    return ctx.reply(helpMessage, { parse_mode: 'Markdown' });
 });
 
 // /ping command
@@ -137,6 +150,65 @@ bot.command('ping', async (ctx) => {
     }
 });
 
+// callback query handlers for inline buttons
+bot.action('show_help', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.editMessageText(helpMessage, { parse_mode: 'Markdown' });
+});
+
+bot.action('create_room_help', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.editMessageText(
+        `🎯 *Creating a Room*\n\n` +
+        `1️⃣ Use \`/createroom\` to start\n` +
+        `2️⃣ Get your room ID\n` +
+        `3️⃣ Invite players with \`/invite <roomId> @username\`\n` +
+        `4️⃣ Players can join with the invite link\n\n` +
+        `Ready to create your first room?`,
+        {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('⬅️ Back', 'show_start')]
+            ])
+        }
+    );
+});
+
+bot.action('setup_wallet_help', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.editMessageText(
+        `💳 *Setting Up Your Wallet*\n\n` +
+        `1️⃣ Install Phantom wallet\n` +
+        `2️⃣ Copy your wallet address\n` +
+        `3️⃣ Use \`/setwallet <your_address>\`\n\n` +
+        `Your wallet will receive settlement payments automatically!`,
+        {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('⬅️ Back', 'show_start')]
+            ])
+        }
+    );
+});
+
+bot.action('show_start', async (ctx) => {
+    const name = ctx.from?.first_name ?? 'there';
+    await ctx.answerCbQuery();
+    await ctx.editMessageText(
+        `👋 *Welcome ${name}!*\n\n` +
+        `I'm *STAC* 🎯 - Your Smart Settlement Tool\n\n` +
+        `I help you manage poker games, track buy-ins, and settle payments with crypto!`,
+        {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('📖 View Commands', 'show_help')],
+                [Markup.button.callback('🎯 Create Room', 'create_room_help')],
+                [Markup.button.callback('💳 Setup Wallet', 'setup_wallet_help')]
+            ])
+        }
+    );
+});
+
 // register room commands
 registerCreateRoom(bot);
 registerInvite(bot);
@@ -154,7 +226,8 @@ registerCashOut(bot);
 registerSettle(bot);
 
 // register payment commands
-registerSolanaPay(bot);
+registerStacPay(bot);
+registerSetWallet(bot);
 
 // global error handler
 bot.catch((err, ctx) => {

@@ -12,7 +12,8 @@ import {
     registerRemoveBuyIn,
     registerSummary,
     registerCashOut,
-    registerSettle
+    registerSettle,
+    registerSolanaPay
 } from './commands';
 import { getRoom, getPlayer, updatePlayerJoined, registerUser } from './db';
 import { formatLatency } from './utils/format';
@@ -109,7 +110,10 @@ bot.command('help', (ctx) => {
         `/summary <roomId> - view room summary\n\n` +
         `🏆 settlement:\n` +
         `/cashout <roomId> <amount> - record final chips\n` +
-        `/settle <roomId> - calculate p&l and settlements`
+        `/settle <roomId> - calculate p&l and settlements\n\n` +
+        `💳 payments:\n` +
+        `/solanapay <address> <amount> - create USDC payment link\n` +
+        `/testpay - quick test payment (5 USDC)`
     );
 });
 
@@ -149,6 +153,9 @@ registerSummary(bot);
 registerCashOut(bot);
 registerSettle(bot);
 
+// register payment commands
+registerSolanaPay(bot);
+
 // global error handler
 bot.catch((err, ctx) => {
     console.error(`global error for update ${ctx.updateType}`, err);
@@ -166,30 +173,33 @@ const server = http.createServer((req, res) => {
     }
 });
 
-// start polling and http server
+// start http server first, then bot
 (async () => {
+    // start http server immediately so Render can detect the port
+    server.listen(PORT, '0.0.0.0', () => {
+        console.log(`http server listening on port ${PORT}`);
+    });
+
+    // then launch bot
     try {
         await bot.launch();
         console.log('bot started (polling). press ctrl-c to stop.');
-
-        server.listen(PORT, '0.0.0.0', () => {
-            console.log(`http server listening on port ${PORT}`);
-        });
-
-        // graceful stop
-        const shutdown = () => {
-            console.log('shutting down...');
-            bot.stop('SIGTERM');
-            server.close(() => {
-                console.log('http server closed');
-                process.exit(0);
-            });
-        };
-
-        process.once('SIGINT', shutdown);
-        process.once('SIGTERM', shutdown);
     } catch (err) {
         console.error('failed to launch bot:', err);
-        process.exit(1);
+        console.error('http server will continue running for health checks');
+        // don't exit - keep http server running for Render health checks
     }
+
+    // graceful stop
+    const shutdown = () => {
+        console.log('shutting down...');
+        bot.stop('SIGTERM');
+        server.close(() => {
+            console.log('http server closed');
+            process.exit(0);
+        });
+    };
+
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
 })();

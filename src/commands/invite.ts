@@ -6,16 +6,19 @@ export const registerInvite = (bot: Telegraf<Context>) => {
     bot.command('invite', async (ctx) => {
         const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
         const args = parseCommandArgs(text);
-        const [roomId, rawUser] = args;
+        const [roomId, ...rawUsers] = args;
 
-        if (!roomId || !rawUser) {
+        if (!roomId || rawUsers.length === 0) {
             return ctx.reply(
                 `📨 *Invite Players*\n\n` +
                 `*Usage:*\n` +
-                `\`/invite <roomId> @username\`\n\n` +
-                `*Example:*\n` +
+                `\`/invite <roomId> @username1 @username2 ...\`\n\n` +
+                `*Single invite:*\n` +
                 `\`/invite abc123 @alice\`\n\n` +
-                `💡 You can invite multiple players by running the command multiple times!`,
+                `*Multiple invites:*\n` +
+                `\`/invite abc123 @alice @bob @charlie\`\n` +
+                `\`/invite abc123 @alice, @bob, @charlie\`\n\n` +
+                `💡 You can invite multiple players at once!`,
                 { parse_mode: 'Markdown' }
             );
         }
@@ -40,100 +43,119 @@ export const registerInvite = (bot: Telegraf<Context>) => {
             );
         }
 
-        const username = parseUsername(rawUser);
+        // Parse all usernames (handle comma-separated or space-separated)
+        const allUsers = rawUsers.join(' ').split(/[,\s]+/).filter(u => u.trim());
+        const usernames = allUsers.map(u => parseUsername(u)).filter(u => u);
 
-        // check if already invited
-        const existing = await getPlayerByUsername(roomId, username);
-        if (existing) {
+        if (usernames.length === 0) {
             return ctx.reply(
-                `ℹ️ *Already Invited*\n\n` +
-                `@${username} is already invited to this room.\n\n` +
-                `${existing.joined ? '✅ They have joined!' : '⏳ Waiting for them to join...'}`,
+                `❌ *No Valid Usernames*\n\n` +
+                `Please provide at least one valid username.\n\n` +
+                `*Example:*\n` +
+                `\`/invite ${roomId} @alice @bob\``,
                 { parse_mode: 'Markdown' }
             );
         }
 
-        await addPlayer(roomId, {
-            userId: 0, // will be set when they join
-            username,
-            buyIn: 0,
-            joined: false
-        });
-
-        // get bot username for deep link
+        // Get bot username for deep link
         const botInfo = await ctx.telegram.getMe();
         const joinLink = `https://t.me/${botInfo.username}?start=join_${roomId}`;
 
-        // check if invited user is already registered
-        const registeredUser = await getUserByUsername(username);
+        // Track results
+        const invited: string[] = [];
+        const alreadyInvited: string[] = [];
+        const dmSent: string[] = [];
+        const dmFailed: string[] = [];
 
-        if (registeredUser) {
-            // send direct message to the registered user
-            try {
-                await ctx.telegram.sendMessage(
-                    registeredUser.userId,
-                    `🎯 *You're Invited!*\n\n` +
-                    `@${room.ownerUsername} invited you to join their poker game!\n\n` +
-                    `🎲 *Room:* \`${roomId}\`\n\n` +
-                    `Click the button below to join the game!`,
-                    {
-                        parse_mode: 'Markdown',
-                        ...Markup.inlineKeyboard([
-                            [Markup.button.url('🎯 Join Room', joinLink)],
-                            [Markup.button.callback('❓ What is STAC?', 'what_is_stac')]
-                        ])
-                    }
-                );
+        // Process each username
+        for (const username of usernames) {
+            // Check if already invited
+            const existing = await getPlayerByUsername(roomId, username);
+            if (existing) {
+                alreadyInvited.push(username);
+                continue;
+            }
 
-                return ctx.reply(
-                    `✅ *Invitation Sent!*\n\n` +
-                    `👤 *Player:* @${username}\n` +
-                    `🎯 *Room:* \`${roomId}\`\n\n` +
-                    `📨 Direct message sent successfully!\n\n` +
-                    `💡 They can also join using: \`/join ${roomId}\``,
-                    {
-                        parse_mode: 'Markdown',
-                        ...Markup.inlineKeyboard([
-                            [Markup.button.callback('👥 Invite More', `invite_more_${roomId}`)],
-                            [Markup.button.callback('🎯 View Room', `view_room_${roomId}`)]
-                        ])
-                    }
-                );
-            } catch (err) {
-                // user might have blocked the bot or not started a conversation
-                console.error('Failed to send direct message:', err);
-                return ctx.reply(
-                    `✅ *Player Invited!*\n\n` +
-                    `👤 *Player:* @${username}\n` +
-                    `🎯 *Room:* \`${roomId}\`\n\n` +
-                    `⚠️ *Note:* Couldn't send direct message.\n` +
-                    `The user may need to start the bot first.\n\n` +
-                    `📤 Share this link with them:`,
-                    {
-                        parse_mode: 'Markdown',
-                        ...Markup.inlineKeyboard([
-                            [Markup.button.url('🔗 Join Link', joinLink)],
-                            [Markup.button.callback('👥 Invite More', `invite_more_${roomId}`)]
-                        ])
-                    }
-                );
+            // Add player to room
+            await addPlayer(roomId, {
+                userId: 0, // will be set when they join
+                username,
+                buyIn: 0,
+                joined: false
+            });
+
+            invited.push(username);
+
+            // Try to send DM if user is registered
+            const registeredUser = await getUserByUsername(username);
+            if (registeredUser) {
+                try {
+                    await ctx.telegram.sendMessage(
+                        registeredUser.userId,
+                        `🎯 *You're Invited!*\n\n` +
+                        `@${room.ownerUsername} invited you to join their poker game!\n\n` +
+                        `🎲 *Room:* \`${roomId}\`\n\n` +
+                        `Click the button below to join the game!`,
+                        {
+                            parse_mode: 'Markdown',
+                            ...Markup.inlineKeyboard([
+                                [Markup.button.url('🎯 Join Room', joinLink)],
+                                [Markup.button.callback('❓ What is STAC?', 'what_is_stac')]
+                            ])
+                        }
+                    );
+                    dmSent.push(username);
+                } catch (err) {
+                    console.error(`Failed to send DM to @${username}:`, err);
+                    dmFailed.push(username);
+                }
             }
         }
 
-        // user not registered yet, just show the link
-        ctx.reply(
-            `✅ *Player Invited!*\n\n` +
-            `👤 *Player:* @${username}\n` +
-            `🎯 *Room:* \`${roomId}\`\n\n` +
-            `📤 Share this link with them to join:`,
-            {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.url('🔗 Join Link', joinLink)],
-                    [Markup.button.callback('👥 Invite More', `invite_more_${roomId}`)]
-                ])
-            }
-        );
+        // Build response message
+        let response = `📨 *Invitation Summary*\n\n🎯 *Room:* \`${roomId}\`\n\n━━━━━━━━━━━━━━━━━━\n\n`;
+
+        if (invited.length > 0) {
+            response += `✅ *Invited (${invited.length})*\n`;
+            invited.forEach(u => response += `   • @${u}\n`);
+            response += `\n`;
+        }
+
+        if (dmSent.length > 0) {
+            response += `📨 *DM Sent (${dmSent.length})*\n`;
+            dmSent.forEach(u => response += `   • @${u}\n`);
+            response += `\n`;
+        }
+
+        if (dmFailed.length > 0) {
+            response += `⚠️ *DM Failed (${dmFailed.length})*\n`;
+            dmFailed.forEach(u => response += `   • @${u}\n`);
+            response += `\n`;
+        }
+
+        if (alreadyInvited.length > 0) {
+            response += `ℹ️ *Already Invited (${alreadyInvited.length})*\n`;
+            alreadyInvited.forEach(u => response += `   • @${u}\n`);
+            response += `\n`;
+        }
+
+        response += `━━━━━━━━━━━━━━━━━━\n\n`;
+
+        if (invited.length > 0) {
+            response += `🔗 *Share this link:*\n${joinLink}\n\n`;
+            response += `💡 Players can also join using: \`/join ${roomId}\``;
+        } else if (alreadyInvited.length === usernames.length) {
+            response += `💡 All users were already invited to this room!`;
+        }
+
+        ctx.reply(response, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.url('🔗 Join Link', joinLink)],
+                [Markup.button.callback('👥 Invite More', `invite_more_${roomId}`)],
+                [Markup.button.callback('🎯 View Room', `view_room_${roomId}`)]
+            ])
+        });
     });
 
     // Callback handlers
@@ -142,9 +164,11 @@ export const registerInvite = (bot: Telegraf<Context>) => {
         await ctx.answerCbQuery();
         await ctx.reply(
             `👥 *Invite More Players*\n\n` +
-            `Use: \`/invite ${roomId} @username\`\n\n` +
-            `*Example:*\n` +
-            `\`/invite ${roomId} @bob\``,
+            `*Single invite:*\n` +
+            `\`/invite ${roomId} @username\`\n\n` +
+            `*Multiple invites:*\n` +
+            `\`/invite ${roomId} @alice @bob @charlie\`\n` +
+            `\`/invite ${roomId} @alice, @bob, @charlie\``,
             { parse_mode: 'Markdown' }
         );
     });

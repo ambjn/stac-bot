@@ -1,4 +1,4 @@
-import { Context, Telegraf } from 'telegraf';
+import { Context, Telegraf, Markup } from 'telegraf';
 import { getRoom, getPlayer, updatePlayerBuyIn } from '../db';
 import { parseCommandArgs } from '../utils/parse';
 import { formatCurrency } from '../utils/format';
@@ -10,17 +10,34 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
         const [roomId, amountStr] = args;
 
         if (!roomId || !amountStr) {
-            return ctx.reply('usage: /removebuyin <roomId> <amount>');
+            return ctx.reply(
+                `💸 *Remove Buy-in*\n\n` +
+                `*Usage:*\n` +
+                `\`/removebuyin <roomId> <amount>\`\n\n` +
+                `*Example:*\n` +
+                `\`/removebuyin abc123 50\`\n\n` +
+                `💡 Use this to correct a mistakenly recorded buy-in!`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) {
-            return ctx.reply('❌ amount must be a positive number.');
+            return ctx.reply(
+                `❌ *Invalid Amount*\n\n` +
+                `The amount must be a positive number.\n\n` +
+                `You entered: \`${amountStr}\``,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         const room = await getRoom(roomId);
         if (!room) {
-            return ctx.reply('❌ room not found.');
+            return ctx.reply(
+                `❌ *Room Not Found*\n\n` +
+                `Room \`${roomId}\` doesn't exist.`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         const userId = ctx.from!.id;
@@ -31,11 +48,19 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
         const player = await getPlayer(roomId, userId, username);
 
         if (!isOwner && !player) {
-            return ctx.reply('❌ you are not a member of this room.');
+            return ctx.reply(
+                `🚫 *Access Denied*\n\n` +
+                `You are not a member of room \`${roomId}\`.`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         if (player && !player.joined) {
-            return ctx.reply('❌ you need to join the room first.');
+            return ctx.reply(
+                `⚠️ *Not Joined Yet*\n\n` +
+                `You need to join the room first!`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         // check if user has any buy-in
@@ -43,7 +68,12 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
         const currentPlayer = await getPlayer(roomId, userId, targetUsername);
 
         if (!currentPlayer || currentPlayer.buyIn === 0) {
-            return ctx.reply('❌ you have no buy-in to remove.');
+            return ctx.reply(
+                `❌ *No Buy-in to Remove*\n\n` +
+                `You haven't recorded any buy-ins yet.\n\n` +
+                `Current buy-in: ₹0`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         // update buy-in
@@ -51,15 +81,27 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
 
         if (!result.success) {
             return ctx.reply(
-                `❌ cannot remove ${formatCurrency(amount)}.\n\n` +
-                `your current buy-in is ${formatCurrency(currentPlayer.buyIn)}.`
+                `❌ *Cannot Remove*\n\n` +
+                `Cannot remove ₹${formatCurrency(amount)}.\n\n` +
+                `Your current buy-in is ₹${formatCurrency(currentPlayer.buyIn)}.\n\n` +
+                `💡 You can only remove up to your current total!`,
+                { parse_mode: 'Markdown' }
             );
         }
 
         ctx.reply(
-            `💸 removed ${formatCurrency(amount)} buy-in\n\n` +
-            `👤 @${targetUsername}\n` +
-            `📊 total: ${formatCurrency(result.newTotal)}`
+            `✅ *Buy-in Removed!*\n\n` +
+            `💸 *Removed:* ₹${formatCurrency(amount)}\n` +
+            `👤 *Player:* @${targetUsername}\n\n` +
+            `━━━━━━━━━━━━━━━━━━\n\n` +
+            `📊 *New Total:* ₹${formatCurrency(result.newTotal)}`,
+            {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('🎯 View Room', `view_room_${roomId}`)],
+                    [Markup.button.callback('📊 Summary', `summary_${roomId}`)]
+                ])
+            }
         );
     });
 };

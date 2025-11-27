@@ -106,49 +106,89 @@ bot.start(async (ctx) => {
 
 // /help command
 const helpMessage =
-    `📚 *STAC Commands*\n\n` +
-    `*🎯 Rooms*\n` +
+    `📖 *STAC COMMAND GUIDE*\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `🎯 *ROOM MANAGEMENT*\n` +
+    `━━━━━━━━━━━━━━━━━━\n\n` +
     `/createroom - Create a new game room\n` +
     `/invite <roomId> @user - Invite a player\n` +
     `/join <roomId> - Join a room\n` +
     `/room <roomId> - View room details\n` +
     `/myrooms - List your rooms\n\n` +
-    `*💰 Buy-ins & Tracking*\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `💰 *BUY-INS & TRACKING*\n` +
+    `━━━━━━━━━━━━━━━━━━\n\n` +
     `/addbuyin <roomId> <amount> - Add buy-in\n` +
     `/removebuyin <roomId> <amount> - Remove buy-in\n` +
     `/cashout <roomId> <amount> - Record final chips\n` +
     `/summary <roomId> - View summary\n\n` +
-    `*🏆 Settlement*\n` +
-    `/settle <roomId> - Calculate & send payment QRs\n\n` +
-    `*💳 Wallet & Payments*\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `💸 *SETTLEMENT*\n` +
+    `━━━━━━━━━━━━━━━━━━\n\n` +
+    `/settle <roomId> - Calculate & send payments\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `💳 *WALLET & PAYMENTS*\n` +
+    `━━━━━━━━━━━━━━━━━━\n\n` +
     `/setwallet <address> - Set Solana wallet\n` +
-    `/stacpay <address> <amount> - Create payment QR\n` +
-    `/testpay - Test payment with default values\n\n` +
-    `*📋 General*\n` +
+    `/stacpay <address> <amount> - Create payment\n` +
+    `/testpay - Test payment\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `⚙️ *GENERAL*\n` +
+    `━━━━━━━━━━━━━━━━━━\n\n` +
     `/help - Show this help\n` +
-    `/ping - Check bot latency`;
+    `/ping - Check bot status`;
 
 bot.command('help', (ctx) => {
-    return ctx.reply(helpMessage, { parse_mode: 'Markdown' });
+    return ctx.reply(helpMessage, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+            [Markup.button.callback('🎯 Create Room', 'create_room_now')],
+            [Markup.button.callback('🏠 My Rooms', 'my_rooms_help')],
+            [Markup.button.callback('💳 Setup Wallet', 'setup_wallet_help')]
+        ])
+    });
+});
+
+// Help callback handlers
+bot.action('my_rooms_help', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+        `🏠 *My Rooms*\n\n` +
+        `Use: \`/myrooms\`\n\n` +
+        `This shows all rooms you own or have joined!`,
+        { parse_mode: 'Markdown' }
+    );
 });
 
 // /ping command
 bot.command('ping', async (ctx) => {
     const start = Date.now();
-    const sent = await ctx.reply('pinging…');
+    const sent = await ctx.reply('🏓 Pinging...');
     const latency = Date.now() - start;
-    const response = `pong! ${formatLatency(latency)}`;
+    const response =
+        `🏓 *Pong!*\n\n` +
+        `⚡ *Latency:* ${formatLatency(latency)}\n` +
+        `✅ *Status:* Online\n\n` +
+        `━━━━━━━━━━━━━━━━━━\n\n` +
+        `🎯 All systems operational!`;
 
     try {
         await ctx.telegram.editMessageText(
             ctx.chat!.id,
             sent.message_id,
             undefined,
-            response
+            response,
+            {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('📖 View Commands', 'show_help')],
+                    [Markup.button.callback('🎯 Create Room', 'create_room_now')]
+                ])
+            }
         );
     } catch {
         // fallback if edit fails (private chats or permissions)
-        await ctx.reply(response);
+        await ctx.reply(response, { parse_mode: 'Markdown' });
     }
 });
 
@@ -231,6 +271,25 @@ registerSettle(bot);
 registerStacPay(bot);
 registerSetWallet(bot);
 registerTestPay(bot);
+
+// Set bot commands (appears in menu button)
+bot.telegram.setMyCommands([
+    { command: 'start', description: '🎯 Start the bot' },
+    { command: 'help', description: '📖 Show all commands' },
+    { command: 'createroom', description: '🎯 Create a new game room' },
+    { command: 'myrooms', description: '🏠 View your rooms' },
+    { command: 'invite', description: '👥 Invite a player' },
+    { command: 'join', description: '✅ Join a room' },
+    { command: 'room', description: '📊 View room details' },
+    { command: 'addbuyin', description: '💰 Add buy-in' },
+    { command: 'removebuyin', description: '💸 Remove buy-in' },
+    { command: 'cashout', description: '🎰 Record cashout' },
+    { command: 'summary', description: '📊 View summary' },
+    { command: 'settle', description: '💸 Settle payments' },
+    { command: 'setwallet', description: '💳 Setup wallet' },
+    { command: 'stacpay', description: '💳 Create payment' },
+    { command: 'ping', description: '🏓 Check bot status' }
+]).catch(err => console.error('Failed to set commands:', err));
 
 // global error handler
 bot.catch((err, ctx) => {

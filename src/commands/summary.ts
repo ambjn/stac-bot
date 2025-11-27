@@ -1,4 +1,4 @@
-import { Context, Telegraf } from 'telegraf';
+import { Context, Telegraf, Markup } from 'telegraf';
 import { getRoom, getPlayer } from '../db';
 import { parseCommandArgs } from '../utils/parse';
 import { formatCurrency } from '../utils/format';
@@ -10,12 +10,24 @@ export const registerSummary = (bot: Telegraf<Context>) => {
         const [roomId] = args;
 
         if (!roomId) {
-            return ctx.reply('usage: /summary <roomId>');
+            return ctx.reply(
+                `📊 *View Summary*\n\n` +
+                `*Usage:*\n` +
+                `\`/summary <roomId>\`\n\n` +
+                `*Example:*\n` +
+                `\`/summary abc123\`\n\n` +
+                `💡 Shows detailed standings and buy-ins for all players!`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         const room = await getRoom(roomId);
         if (!room) {
-            return ctx.reply('❌ room not found.');
+            return ctx.reply(
+                `❌ *Room Not Found*\n\n` +
+                `Room \`${roomId}\` doesn't exist.`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         const userId = ctx.from!.id;
@@ -26,7 +38,11 @@ export const registerSummary = (bot: Telegraf<Context>) => {
         const player = await getPlayer(roomId, userId, username);
 
         if (!isOwner && (!player || !player.joined)) {
-            return ctx.reply('❌ you don\'t have access to this room.');
+            return ctx.reply(
+                `🚫 *Access Denied*\n\n` +
+                `You don't have access to room \`${roomId}\`.`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         // calculate totals
@@ -35,10 +51,20 @@ export const registerSummary = (bot: Telegraf<Context>) => {
 
         if (activePlayers.length === 0) {
             return ctx.reply(
-                `📊 room summary: ${roomId}\n\n` +
-                `👑 owner: @${room.ownerUsername}\n` +
-                `📅 created: ${room.createdAt.toLocaleDateString()}\n\n` +
-                `no players with buy-ins yet.`
+                `📊 *ROOM SUMMARY*\n\n` +
+                `🎯 *Room:* \`${roomId}\`\n` +
+                `👑 *Owner:* @${room.ownerUsername}\n` +
+                `📅 *Created:* ${room.createdAt.toLocaleDateString()}\n\n` +
+                `━━━━━━━━━━━━━━━━━━\n\n` +
+                `⚠️ No players with buy-ins yet.\n\n` +
+                `💡 Use \`/addbuyin\` to start tracking!`,
+                {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('💰 Add Buy-in', `addbuyin_help_${roomId}`)],
+                        [Markup.button.callback('🎯 View Room', `view_room_${roomId}`)]
+                    ])
+                }
             );
         }
 
@@ -48,29 +74,43 @@ export const registerSummary = (bot: Telegraf<Context>) => {
         // build player list with percentages
         const playerLines = sortedPlayers.map((p, i) => {
             const percentage = totalBuyIn > 0 ? (p.buyIn / totalBuyIn * 100).toFixed(1) : '0.0';
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '  ';
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '   ';
             const status = p.joined ? '' : ' ⏳';
-            return `${medal} @${p.username}${status}\n    ${formatCurrency(p.buyIn)} (${percentage}%)`;
+            return `${medal} @${p.username}${status}\n      ₹${formatCurrency(p.buyIn)} (${percentage}%)`;
         });
 
         // build summary
         const summary = [
-            `📊 room summary: ${roomId}`,
-            ``,
-            `👑 owner: @${room.ownerUsername}`,
-            `📅 created: ${room.createdAt.toLocaleDateString()}`,
+            `📊 *ROOM SUMMARY*\n`,
+            `🎯 *Room:* \`${roomId}\``,
+            `👑 *Owner:* @${room.ownerUsername}`,
+            `📅 *Created:* ${room.createdAt.toLocaleDateString()}`,
+            `📊 *Status:* ${room.settled ? '✅ Settled' : '🎮 Active'}`,
             ``,
             `━━━━━━━━━━━━━━━━━━`,
-            `👥 players (${activePlayers.length})`,
-            `━━━━━━━━━━━━━━━━━━`,
-            ``,
+            `👥 *PLAYERS* (${activePlayers.length})`,
+            `━━━━━━━━━━━━━━━━━━\n`,
             ...playerLines,
             ``,
             `━━━━━━━━━━━━━━━━━━`,
-            `💰 total: ${formatCurrency(totalBuyIn)}`,
+            `💰 *TOTAL BUY-INS*`,
+            `₹${formatCurrency(totalBuyIn)}`,
             `━━━━━━━━━━━━━━━━━━`,
         ].join('\n');
 
-        ctx.reply(summary);
+        const buttons = isOwner
+            ? [
+                [Markup.button.callback('💸 Settle Room', `settle_help_${roomId}`)],
+                [Markup.button.callback('🎯 View Room', `view_room_${roomId}`)]
+            ]
+            : [
+                [Markup.button.callback('💰 Add Buy-in', `addbuyin_help_${roomId}`)],
+                [Markup.button.callback('🎯 View Room', `view_room_${roomId}`)]
+            ];
+
+        ctx.reply(summary, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard(buttons)
+        });
     });
 };

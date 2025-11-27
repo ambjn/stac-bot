@@ -272,6 +272,25 @@ registerStacPay(bot);
 registerSetWallet(bot);
 registerTestPay(bot);
 
+// Set bot commands (appears in menu button)
+bot.telegram.setMyCommands([
+    { command: 'start', description: '🎯 Start the bot' },
+    { command: 'help', description: '📖 Show all commands' },
+    { command: 'createroom', description: '🎯 Create a new game room' },
+    { command: 'myrooms', description: '🏠 View your rooms' },
+    { command: 'invite', description: '👥 Invite a player' },
+    { command: 'join', description: '✅ Join a room' },
+    { command: 'room', description: '📊 View room details' },
+    { command: 'addbuyin', description: '💰 Add buy-in' },
+    { command: 'removebuyin', description: '💸 Remove buy-in' },
+    { command: 'cashout', description: '🎰 Record cashout' },
+    { command: 'summary', description: '📊 View summary' },
+    { command: 'settle', description: '💸 Settle payments' },
+    { command: 'setwallet', description: '💳 Setup wallet' },
+    { command: 'stacpay', description: '💳 Create payment' },
+    { command: 'ping', description: '🏓 Check bot status' }
+]).catch(err => console.error('Failed to set commands:', err));
+
 // global error handler
 bot.catch((err, ctx) => {
     console.error(`global error for update ${ctx.updateType}`, err);

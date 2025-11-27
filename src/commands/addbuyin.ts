@@ -1,4 +1,4 @@
-import { Context, Telegraf } from 'telegraf';
+import { Context, Telegraf, Markup } from 'telegraf';
 import { getRoom, getPlayer, updatePlayerBuyIn } from '../db';
 import { parseCommandArgs } from '../utils/parse';
 import { formatCurrency } from '../utils/format';
@@ -10,17 +10,35 @@ export const registerAddBuyIn = (bot: Telegraf<Context>) => {
         const [roomId, amountStr] = args;
 
         if (!roomId || !amountStr) {
-            return ctx.reply('usage: /addbuyin <roomId> <amount>');
+            return ctx.reply(
+                `💰 *Add Buy-in*\n\n` +
+                `*Usage:*\n` +
+                `\`/addbuyin <roomId> <amount>\`\n\n` +
+                `*Example:*\n` +
+                `\`/addbuyin abc123 100\`\n\n` +
+                `💡 Record each buy-in as you add chips during the game!`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) {
-            return ctx.reply('❌ amount must be a positive number.');
+            return ctx.reply(
+                `❌ *Invalid Amount*\n\n` +
+                `The amount must be a positive number.\n\n` +
+                `You entered: \`${amountStr}\``,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         const room = await getRoom(roomId);
         if (!room) {
-            return ctx.reply('❌ room not found.');
+            return ctx.reply(
+                `❌ *Room Not Found*\n\n` +
+                `Room \`${roomId}\` doesn't exist.\n\n` +
+                `Use \`/myrooms\` to see your rooms.`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         const userId = ctx.from!.id;
@@ -31,11 +49,20 @@ export const registerAddBuyIn = (bot: Telegraf<Context>) => {
         const player = await getPlayer(roomId, userId, username);
 
         if (!isOwner && !player) {
-            return ctx.reply('❌ you are not a member of this room.');
+            return ctx.reply(
+                `🚫 *Access Denied*\n\n` +
+                `You are not a member of room \`${roomId}\`.`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         if (player && !player.joined) {
-            return ctx.reply('❌ you need to join the room first.');
+            return ctx.reply(
+                `⚠️ *Not Joined Yet*\n\n` +
+                `You need to join the room first!\n\n` +
+                `Use: \`/join ${roomId}\``,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         // update buy-in
@@ -43,13 +70,39 @@ export const registerAddBuyIn = (bot: Telegraf<Context>) => {
         const result = await updatePlayerBuyIn(roomId, userId, targetUsername, amount, 'add');
 
         if (!result.success) {
-            return ctx.reply(`❌ ${result.error}`);
+            return ctx.reply(
+                `❌ *Error*\n\n${result.error}`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
         ctx.reply(
-            `💰 added ${formatCurrency(amount)} buy-in\n\n` +
-            `👤 @${targetUsername}\n` +
-            `📊 total: ${formatCurrency(result.newTotal)}`
+            `✅ *Buy-in Added!*\n\n` +
+            `💰 *Amount:* ₹${formatCurrency(amount)}\n` +
+            `👤 *Player:* @${targetUsername}\n\n` +
+            `━━━━━━━━━━━━━━━━━━\n\n` +
+            `📊 *Total Buy-in:* ₹${formatCurrency(result.newTotal)}`,
+            {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('💰 Add More', `addmore_${roomId}`)],
+                    [Markup.button.callback('🎯 View Room', `view_room_${roomId}`)],
+                    [Markup.button.callback('📊 Summary', `summary_${roomId}`)]
+                ])
+            }
+        );
+    });
+
+    // Callback handler
+    bot.action(/addmore_(.+)/, async (ctx) => {
+        const roomId = ctx.match[1];
+        await ctx.answerCbQuery();
+        await ctx.reply(
+            `💰 *Add Another Buy-in*\n\n` +
+            `Use: \`/addbuyin ${roomId} <amount>\`\n\n` +
+            `*Example:*\n` +
+            `\`/addbuyin ${roomId} 50\``,
+            { parse_mode: 'Markdown' }
         );
     });
 };

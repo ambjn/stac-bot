@@ -14,7 +14,8 @@ import {
     registerCashOut,
     registerSettle,
     registerStacPay,
-    registerSetWallet
+    registerSetWallet,
+    registerTestPay
 } from './commands';
 import { getRoom, getPlayer, updatePlayerJoined, registerUser } from './db';
 import { formatLatency } from './utils/format';
@@ -121,7 +122,8 @@ const helpMessage =
     `/settle <roomId> - Calculate & send payment QRs\n\n` +
     `*💳 Wallet & Payments*\n` +
     `/setwallet <address> - Set Solana wallet\n` +
-    `/stacpay <address> <amount> - Create payment QR\n\n` +
+    `/stacpay <address> <amount> - Create payment QR\n` +
+    `/testpay - Test payment with default values\n\n` +
     `*📋 General*\n` +
     `/help - Show this help\n` +
     `/ping - Check bot latency`;
@@ -228,6 +230,7 @@ registerSettle(bot);
 // register payment commands
 registerStacPay(bot);
 registerSetWallet(bot);
+registerTestPay(bot);
 
 // global error handler
 bot.catch((err, ctx) => {

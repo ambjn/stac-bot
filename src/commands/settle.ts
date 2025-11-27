@@ -166,28 +166,16 @@ export const registerSettle = (bot: Telegraf<Context>) => {
                 });
 
                 const solanaUrl = url.toString();
-                const clickableUrl = `https://dial.to/?action=solana-action:${encodeURIComponent(solanaUrl)}`;
 
-                // Generate QR code with raw Solana Pay URL for wallet scanners
-                const qrBuffer = await QRCode.toBuffer(solanaUrl, {
-                    width: 512,
-                    margin: 2,
-                    color: {
-                        dark: '#000000',
-                        light: '#FFFFFF'
-                    }
-                });
-
-                // Send QR code to the payer via DM
-                await bot.telegram.sendPhoto(
+                // Send payment URL to the payer via DM
+                await bot.telegram.sendMessage(
                     payerUser.userId,
-                    { source: qrBuffer },
+                    `💸 *Settlement Payment Due*\n\n` +
+                    `*Room:* \`${roomId}\`\n` +
+                    `*Pay to:* @${s.to}\n` +
+                    `*Amount:* ₹${formatCurrency(s.amount)} (${s.amount} USDC)\n\n` +
+                    `🔗 *Payment URL:*\n${solanaUrl}`,
                     {
-                        caption:
-                            `💸 *Settlement Payment Due*\n\n` +
-                            `*Room:* \`${roomId}\`\n` +
-                            `*Pay to:* @${s.to}\n` +
-                            `*Amount:* ₹${formatCurrency(s.amount)} (${s.amount} USDC)`,
                         parse_mode: 'Markdown',
                         ...Markup.inlineKeyboard([
                             [Markup.button.callback('✅ Mark as Paid', `mark_paid_${roomId}_${s.from}_${s.to}`)]
@@ -196,17 +184,17 @@ export const registerSettle = (bot: Telegraf<Context>) => {
                 );
 
             } catch (err) {
-                console.error(`Error generating QR code for ${s.from} -> ${s.to}:`, err);
+                console.error(`Error generating payment URL for ${s.from} -> ${s.to}:`, err);
                 await ctx.reply(
-                    `❌ failed to generate payment QR for @${s.from} -> @${s.to}`
+                    `❌ failed to generate payment URL for @${s.from} -> @${s.to}`
                 );
             }
         }
 
         if (settlement.settlements.length > 0) {
             await ctx.reply(
-                `📬 *Payment QR Codes Sent!*\n\n` +
-                `Payment QR codes have been sent via DM to users who owe money.\n\n` +
+                `📬 *Payment URLs Sent!*\n\n` +
+                `Payment URLs have been sent via DM to users who owe money.\n\n` +
                 `💡 Check your private messages with the bot to complete payments.`,
                 {
                     parse_mode: 'Markdown',

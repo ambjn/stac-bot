@@ -10,3 +10,4 @@ export * from './cashout';
 export * from './settle';
 export * from './stacpay';
 export * from './setwallet';
+export * from './testpay';

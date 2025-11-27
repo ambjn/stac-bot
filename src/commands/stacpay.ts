@@ -53,28 +53,14 @@ export function registerStacPay(bot: Telegraf<Context>) {
             });
 
             const solanaUrl = url.toString();
-            const clickableUrl = `https://dial.to/?action=solana-action:${encodeURIComponent(solanaUrl)}`;
 
-            // Generate QR code with raw Solana Pay URL for wallet scanners
-            const qrBuffer = await QRCode.toBuffer(solanaUrl, {
-                width: 512,
-                margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                }
-            });
-
-            // Send QR code image
-            await ctx.replyWithPhoto(
-                { source: qrBuffer },
-                {
-                    caption:
-                        `✅ *Payment QR Code Created!*\n\n` +
-                        `💰 *Amount:* ${amount} USDC\n` +
-                        `📍 *Recipient:* \`${recipientAddress}\``,
-                    parse_mode: 'Markdown'
-                }
+            // Send Solana Pay URL
+            await ctx.reply(
+                `✅ *Payment Link Created!*\n\n` +
+                `💰 *Amount:* ${amount} USDC\n` +
+                `📍 *Recipient:* \`${recipientAddress}\`\n\n` +
+                `🔗 *Payment URL:*\n${solanaUrl}`,
+                { parse_mode: 'Markdown' }
             );
 
             return;

@@ -171,6 +171,9 @@ export const registerSettle = (bot: Telegraf<Context>) => {
 
                 const solanaUrl = url.toString();
 
+                // Build payment API URL with parameters
+                const paymentUrl = `${PAYMENT_API_URL}?recipient=${encodeURIComponent(recipientWallet)}&amount=${s.amount}`;
+
                 // Send payment URL to the payer via DM
                 await bot.telegram.sendMessage(
                     payerUser.userId,
@@ -178,11 +181,11 @@ export const registerSettle = (bot: Telegraf<Context>) => {
                     `*Room:* \`${roomId}\`\n` +
                     `*Pay to:* @${s.to}\n` +
                     `*Amount:* ₹${formatCurrency(s.amount)} (${s.amount} USDC)\n\n` +
-                    `🔗 *Payment URL:*\n${solanaUrl}`,
+                    `Click the button below to proceed with payment.`,
                     {
                         parse_mode: 'Markdown',
                         ...Markup.inlineKeyboard([
-                            [Markup.button.url('💳 PAY', PAYMENT_API_URL)],
+                            [Markup.button.url('💳 PAY', paymentUrl)],
                             [Markup.button.callback('✅ Mark as Paid', `mark_paid_${roomId}_${s.from}_${s.to}`)]
                         ])
                     }

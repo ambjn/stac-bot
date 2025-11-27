@@ -58,16 +58,19 @@ export function registerStacPay(bot: Telegraf<Context>) {
 
             const solanaUrl = url.toString();
 
-            // Send Solana Pay URL with redirect button
+            // Build payment API URL with parameters
+            const paymentUrl = `${PAYMENT_API_URL}?recipient=${encodeURIComponent(recipientAddress)}&amount=${amount}`;
+
+            // Send Solana Pay URL with URL button
             await ctx.reply(
                 `✅ *Payment Link Created!*\n\n` +
                 `💰 *Amount:* ${amount} USDC\n` +
                 `📍 *Recipient:* \`${recipientAddress}\`\n\n` +
-                `🔗 *Payment URL:*\n${solanaUrl}`,
+                `Click the button below to proceed with payment.`,
                 {
                     parse_mode: 'Markdown',
                     ...Markup.inlineKeyboard([
-                        [Markup.button.url('💳 PAY', PAYMENT_API_URL)]
+                        [Markup.button.url('💳 PAY', paymentUrl)]
                     ])
                 }
             );

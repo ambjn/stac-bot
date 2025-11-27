@@ -1,14 +1,13 @@
 import { Telegraf, Context } from 'telegraf';
 import { Markup } from 'telegraf';
 import { PublicKey } from '@solana/web3.js';
-import { encodeURL, createQR } from '@solana/pay';
+import { encodeURL } from '@solana/pay';
 import BigNumber from 'bignumber.js';
-import QRCode from 'qrcode';
 
 // USDC SPL Token mint address on Solana Mainnet
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 
-// Hardcoded test values
+// Fixed test parameters
 const TEST_WALLET = '41Jw4SWMio5tfuqLWhe8QDHaUMoAEZnMV1PaBikrpBko';
 const TEST_AMOUNT = 5;
 
@@ -18,7 +17,7 @@ const PAYMENT_API_URL = process.env.PAYMENT_API_URL || 'http://192.168.1.8:3000/
 export function registerTestPay(bot: Telegraf<Context>) {
     bot.command('testpay', async (ctx) => {
         try {
-            // Use hardcoded values
+            // Validate recipient address
             const recipient = new PublicKey(TEST_WALLET);
 
             // Create Solana Pay URL for USDC transfer
@@ -34,31 +33,30 @@ export function registerTestPay(bot: Telegraf<Context>) {
 
             const solanaUrl = url.toString();
 
-            // Send Solana Pay URL with redirect button
+            // Build payment API URL with parameters
+            const paymentUrl = `${PAYMENT_API_URL}?recipient=${encodeURIComponent(TEST_WALLET)}&amount=${TEST_AMOUNT}`;
+
+            // Send message with URL button
             await ctx.reply(
-                `✅ *Test Payment Link Created!*\n\n` +
+                `🧪 *Test Payment*\n\n` +
                 `💰 *Amount:* ${TEST_AMOUNT} USDC\n` +
                 `📍 *Recipient:* \`${TEST_WALLET}\`\n\n` +
-                `🔗 *Payment URL:*\n${solanaUrl}\n\n` +
-                `_This is a test payment with hardcoded values._`,
+                `Click the button below to proceed with payment.`,
                 {
                     parse_mode: 'Markdown',
                     ...Markup.inlineKeyboard([
-                        [Markup.button.url('💳 PAY', PAYMENT_API_URL)]
+                        [Markup.button.url('💳 PAY', paymentUrl)]
                     ])
                 }
             );
 
-            return;
-
         } catch (err) {
-            console.error('Error creating test Solana Pay link:', err);
+            console.error('Error creating test payment link:', err);
             return ctx.reply(
                 `❌ *Error Creating Test Payment Link*\n\n` +
-                `Please try again or contact support.`,
+                `${err instanceof Error ? err.message : 'Unknown error'}`,
                 { parse_mode: 'Markdown' }
             );
         }
     });
-
 }

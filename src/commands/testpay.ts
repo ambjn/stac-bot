@@ -12,6 +12,9 @@ const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 const TEST_WALLET = '41Jw4SWMio5tfuqLWhe8QDHaUMoAEZnMV1PaBikrpBko';
 const TEST_AMOUNT = 5;
 
+// Payment API URL from environment
+const PAYMENT_API_URL = process.env.PAYMENT_API_URL || 'http://192.168.1.8:3000/pay';
+
 export function registerTestPay(bot: Telegraf<Context>) {
     bot.command('testpay', async (ctx) => {
         try {
@@ -26,18 +29,24 @@ export function registerTestPay(bot: Telegraf<Context>) {
                 label: 'STAC Test Payment',
                 message: `Test payment of ${TEST_AMOUNT} USDC`,
                 memo: `STAC-TEST-${Date.now()}`,
+                link: new URL(PAYMENT_API_URL),
             });
 
             const solanaUrl = url.toString();
 
-            // Send Solana Pay URL
+            // Send Solana Pay URL with redirect button
             await ctx.reply(
                 `✅ *Test Payment Link Created!*\n\n` +
                 `💰 *Amount:* ${TEST_AMOUNT} USDC\n` +
                 `📍 *Recipient:* \`${TEST_WALLET}\`\n\n` +
                 `🔗 *Payment URL:*\n${solanaUrl}\n\n` +
                 `_This is a test payment with hardcoded values._`,
-                { parse_mode: 'Markdown' }
+                {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.url('💳 PAY', PAYMENT_API_URL)]
+                    ])
+                }
             );
 
             return;

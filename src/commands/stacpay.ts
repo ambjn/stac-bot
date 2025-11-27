@@ -8,6 +8,9 @@ import QRCode from 'qrcode';
 // USDC SPL Token mint address on Solana Mainnet
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 
+// Payment API URL from environment
+const PAYMENT_API_URL = process.env.PAYMENT_API_URL || 'http://192.168.1.8:3000/pay';
+
 export function registerStacPay(bot: Telegraf<Context>) {
     bot.command('stacpay', async (ctx) => {
         const args = ctx.message?.text?.split(' ').slice(1) || [];
@@ -50,17 +53,23 @@ export function registerStacPay(bot: Telegraf<Context>) {
                 label: 'STAC Payment',
                 message: `Payment of ${amount} USDC`,
                 memo: `STAC-${Date.now()}`,
+                link: new URL(PAYMENT_API_URL),
             });
 
             const solanaUrl = url.toString();
 
-            // Send Solana Pay URL
+            // Send Solana Pay URL with redirect button
             await ctx.reply(
                 `✅ *Payment Link Created!*\n\n` +
                 `💰 *Amount:* ${amount} USDC\n` +
                 `📍 *Recipient:* \`${recipientAddress}\`\n\n` +
                 `🔗 *Payment URL:*\n${solanaUrl}`,
-                { parse_mode: 'Markdown' }
+                {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.url('💳 PAY', PAYMENT_API_URL)]
+                    ])
+                }
             );
 
             return;

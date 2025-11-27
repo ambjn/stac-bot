@@ -9,6 +9,9 @@ import { encodeURL } from '@solana/pay';
 import BigNumber from 'bignumber.js';
 import QRCode from 'qrcode';
 
+// Payment API URL from environment
+const PAYMENT_API_URL = process.env.PAYMENT_API_URL || 'http://192.168.1.8:3000/pay';
+
 export const registerSettle = (bot: Telegraf<Context>) => {
     bot.command('settle', async (ctx) => {
         const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
@@ -163,6 +166,7 @@ export const registerSettle = (bot: Telegraf<Context>) => {
                     label: `STAC Settlement - Room ${roomId}`,
                     message: `Settlement payment to @${s.to}`,
                     memo: `STAC-${roomId}-${Date.now()}`,
+                    link: new URL(PAYMENT_API_URL),
                 });
 
                 const solanaUrl = url.toString();
@@ -178,6 +182,7 @@ export const registerSettle = (bot: Telegraf<Context>) => {
                     {
                         parse_mode: 'Markdown',
                         ...Markup.inlineKeyboard([
+                            [Markup.button.url('💳 PAY', PAYMENT_API_URL)],
                             [Markup.button.callback('✅ Mark as Paid', `mark_paid_${roomId}_${s.from}_${s.to}`)]
                         ])
                     }

@@ -11,14 +11,11 @@ export const registerCashOut = (bot: Telegraf<Context>) => {
 
         if (!roomId || !amountStr) {
             return ctx.reply(
-                `🎰 *Record Cashout*\n\n` +
-                `*Usage:*\n` +
-                `\`/cashout <roomId> <amount>\`\n\n` +
-                `*Example:*\n` +
-                `\`/cashout abc123 250\`\n\n` +
-                `💡 Record your final chip count at the end of the game!\n` +
-                `Use 0 if you lost everything.`,
-                { parse_mode: 'Markdown' }
+                `/cashout <roomId> <amount>\n\n` +
+                `example:\n` +
+                `/cashout abc123 320\n\n` +
+                `note:\n` +
+                `this sets your final chip value for the room - admins will use these values during settlement.`
             );
         }
 

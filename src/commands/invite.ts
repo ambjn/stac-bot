@@ -10,16 +10,11 @@ export const registerInvite = (bot: Telegraf<Context>) => {
 
         if (!roomId || rawUsers.length === 0) {
             return ctx.reply(
-                `📨 *Invite Players*\n\n` +
-                `*Usage:*\n` +
-                `\`/invite <roomId> @username1 @username2 ...\`\n\n` +
-                `*Single invite:*\n` +
-                `\`/invite abc123 @alice\`\n\n` +
-                `*Multiple invites:*\n` +
-                `\`/invite abc123 @alice @bob @charlie\`\n` +
-                `\`/invite abc123 @alice, @bob, @charlie\`\n\n` +
-                `💡 You can invite multiple players at once!`,
-                { parse_mode: 'Markdown' }
+                `/invite <roomId> @username, @username, @username\n\n` +
+                `example:\n` +
+                `/invite abc123 @alex, @maria, @tom\n\n` +
+                `note:\n` +
+                `you can invite multiple users at once by separating their usernames with a comma.`
             );
         }
 
@@ -163,13 +158,11 @@ export const registerInvite = (bot: Telegraf<Context>) => {
         const roomId = ctx.match[1];
         await ctx.answerCbQuery();
         await ctx.reply(
-            `👥 *Invite More Players*\n\n` +
-            `*Single invite:*\n` +
-            `\`/invite ${roomId} @username\`\n\n` +
-            `*Multiple invites:*\n` +
-            `\`/invite ${roomId} @alice @bob @charlie\`\n` +
-            `\`/invite ${roomId} @alice, @bob, @charlie\``,
-            { parse_mode: 'Markdown' }
+            `/invite <roomId> @username, @username, @username\n\n` +
+            `example:\n` +
+            `/invite ${roomId} @alex, @maria, @tom\n\n` +
+            `note:\n` +
+            `you can invite multiple users at once by separating their usernames with a comma.`
         );
     });
 

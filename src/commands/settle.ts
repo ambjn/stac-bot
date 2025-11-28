@@ -19,7 +19,13 @@ export const registerSettle = (bot: Telegraf<Context>) => {
         const [roomId] = args;
 
         if (!roomId) {
-            return ctx.reply('usage: /settle <roomId>');
+            return ctx.reply(
+                `/settle <roomId>\n\n` +
+                `example:\n` +
+                `/settle abc123\n\n` +
+                `note:\n` +
+                `only admins can settle a room - the command processes all buy-ins, cashouts, and stack changes to produce the final payouts.`
+            );
         }
 
         const room = await getRoom(roomId);

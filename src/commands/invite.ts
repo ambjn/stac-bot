@@ -20,21 +20,27 @@ export const registerInvite = (bot: Telegraf<Context>) => {
 
         const room = await getRoom(roomId);
         if (!room) {
+            const escapeMarkdown = (text: string) => {
+                return text.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+            };
             return ctx.reply(
                 `❌ *Room Not Found*\n\n` +
-                `Room \`${roomId}\` doesn't exist.\n\n` +
-                `Use \`/myrooms\` to see your rooms.`,
-                { parse_mode: 'Markdown' }
+                `Room \`${escapeMarkdown(roomId)}\` doesn't exist\\.\n\n` +
+                `Use \`/myrooms\` to see your rooms\\.`,
+                { parse_mode: 'MarkdownV2' }
             );
         }
 
         // only owner can invite
         if (room.ownerId !== ctx.from!.id) {
+            const escapeMarkdown = (text: string) => {
+                return text.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+            };
             return ctx.reply(
                 `🚫 *Permission Denied*\n\n` +
-                `Only the room owner can invite players.\n\n` +
-                `👑 Owner: @${room.ownerUsername}`,
-                { parse_mode: 'Markdown' }
+                `Only the room owner can invite players\\.\n\n` +
+                `👑 Owner: @${escapeMarkdown(room.ownerUsername)}`,
+                { parse_mode: 'MarkdownV2' }
             );
         }
 
@@ -43,12 +49,15 @@ export const registerInvite = (bot: Telegraf<Context>) => {
         const usernames = allUsers.map(u => parseUsername(u)).filter(u => u);
 
         if (usernames.length === 0) {
+            const escapeMarkdown = (text: string) => {
+                return text.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+            };
             return ctx.reply(
                 `❌ *No Valid Usernames*\n\n` +
-                `Please provide at least one valid username.\n\n` +
+                `Please provide at least one valid username\\.\n\n` +
                 `*Example:*\n` +
-                `\`/invite ${roomId} @alice @bob\``,
-                { parse_mode: 'Markdown' }
+                `\`/invite ${escapeMarkdown(roomId)} @alice @bob\``,
+                { parse_mode: 'MarkdownV2' }
             );
         }
 
@@ -85,18 +94,17 @@ export const registerInvite = (bot: Telegraf<Context>) => {
             const registeredUser = await getUserByUsername(username);
             if (registeredUser) {
                 try {
+                    const escapeMarkdown = (text: string) => {
+                        return text.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+                    };
                     await ctx.telegram.sendMessage(
                         registeredUser.userId,
-                        `🎯 *You're Invited!*\n\n` +
-                        `@${room.ownerUsername} invited you to join their poker game!\n\n` +
-                        `🎲 *Room:* \`${roomId}\`\n\n` +
-                        `Click the button below to join the game!`,
+                        `🎯 *You're Invited\\!*\n\n` +
+                        `@${escapeMarkdown(room.ownerUsername)} invited you to join their poker game\\!\n\n` +
+                        `🎲 *Room:* \`${escapeMarkdown(roomId)}\`\n\n` +
+                        `Use \`/join ${escapeMarkdown(roomId)}\` to join the game\\!`,
                         {
-                            parse_mode: 'Markdown',
-                            ...Markup.inlineKeyboard([
-                                [Markup.button.url('🎯 Join Room', joinLink)],
-                                [Markup.button.callback('❓ What is STAC?', 'what_is_stac')]
-                            ])
+                            parse_mode: 'MarkdownV2'
                         }
                     );
                     dmSent.push(username);
@@ -107,44 +115,48 @@ export const registerInvite = (bot: Telegraf<Context>) => {
             }
         }
 
-        // Build response message
-        let response = `📨 *Invitation Summary*\n\n🎯 *Room:* \`${roomId}\`\n\n━━━━━━━━━━━━━━━━━━\n\n`;
+        // Build response message (using MarkdownV2 with proper escaping)
+        const escapeMarkdown = (text: string) => {
+            return text.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+        };
+
+        let response = `📨 *Invitation Summary*\n\n🎯 *Room:* \`${escapeMarkdown(roomId)}\`\n\n━━━━━━━━━━━━━━━━━━\n\n`;
 
         if (invited.length > 0) {
-            response += `✅ *Invited (${invited.length})*\n`;
-            invited.forEach(u => response += `   • @${u}\n`);
+            response += `✅ *Invited \\(${invited.length}\\)*\n`;
+            invited.forEach(u => response += `   • @${escapeMarkdown(u)}\n`);
             response += `\n`;
         }
 
         if (dmSent.length > 0) {
-            response += `📨 *DM Sent (${dmSent.length})*\n`;
-            dmSent.forEach(u => response += `   • @${u}\n`);
+            response += `📨 *DM Sent \\(${dmSent.length}\\)*\n`;
+            dmSent.forEach(u => response += `   • @${escapeMarkdown(u)}\n`);
             response += `\n`;
         }
 
         if (dmFailed.length > 0) {
-            response += `⚠️ *DM Failed (${dmFailed.length})*\n`;
-            dmFailed.forEach(u => response += `   • @${u}\n`);
+            response += `⚠️ *DM Failed \\(${dmFailed.length}\\)*\n`;
+            dmFailed.forEach(u => response += `   • @${escapeMarkdown(u)}\n`);
             response += `\n`;
         }
 
         if (alreadyInvited.length > 0) {
-            response += `ℹ️ *Already Invited (${alreadyInvited.length})*\n`;
-            alreadyInvited.forEach(u => response += `   • @${u}\n`);
+            response += `ℹ️ *Already Invited \\(${alreadyInvited.length}\\)*\n`;
+            alreadyInvited.forEach(u => response += `   • @${escapeMarkdown(u)}\n`);
             response += `\n`;
         }
 
         response += `━━━━━━━━━━━━━━━━━━\n\n`;
 
         if (invited.length > 0) {
-            response += `🔗 *Share this link:*\n${joinLink}\n\n`;
-            response += `💡 Players can also join using: \`/join ${roomId}\``;
+            response += `🔗 *Share this link:*\n${escapeMarkdown(joinLink)}\n\n`;
+            response += `💡 Players can also join using: \`/join ${escapeMarkdown(roomId)}\``;
         } else if (alreadyInvited.length === usernames.length) {
-            response += `💡 All users were already invited to this room!`;
+            response += `💡 All users were already invited to this room\\!`;
         }
 
         ctx.reply(response, {
-            parse_mode: 'Markdown',
+            parse_mode: 'MarkdownV2',
             ...Markup.inlineKeyboard([
                 [Markup.button.url('🔗 Join Link', joinLink)],
                 [Markup.button.callback('👥 Invite More', `invite_more_${roomId}`)],
@@ -163,21 +175,6 @@ export const registerInvite = (bot: Telegraf<Context>) => {
             `/invite ${roomId} @alex, @maria, @tom\n\n` +
             `note:\n` +
             `you can invite multiple users at once by separating their usernames with a comma.`
-        );
-    });
-
-    bot.action('what_is_stac', async (ctx) => {
-        await ctx.answerCbQuery();
-        await ctx.reply(
-            `🎯 *What is STAC?*\n\n` +
-            `STAC is your Smart Settlement Tool for poker games!\n\n` +
-            `✨ *Features:*\n` +
-            `• Track buy-ins and cashouts\n` +
-            `• Automatic settlement calculations\n` +
-            `• Crypto payments via Solana\n` +
-            `• Simple and transparent\n\n` +
-            `Ready to play? Accept the invitation above!`,
-            { parse_mode: 'Markdown' }
         );
     });
 };

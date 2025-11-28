@@ -11,13 +11,12 @@ export const registerRemoveBuyIn = (bot: Telegraf<Context>) => {
 
         if (!roomId || !amountStr) {
             return ctx.reply(
-                `💸 *Remove Buy-in*\n\n` +
-                `*Usage:*\n` +
-                `\`/removebuyin <roomId> <amount>\`\n\n` +
-                `*Example:*\n` +
-                `\`/removebuyin abc123 50\`\n\n` +
-                `💡 Use this to correct a mistakenly recorded buy-in!`,
-                { parse_mode: 'Markdown' }
+                `/removebuyin <roomId> <amount>\n\n` +
+                `example:\n` +
+                `/removebuyin abc123 50\n` +
+                `/removebuyin abc123 100\n\n` +
+                `note:\n` +
+                `only room admins can remove buy-ins, and the amount is deducted from the player's current stack.`
             );
         }
 

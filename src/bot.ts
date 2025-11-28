@@ -90,14 +90,20 @@ bot.start(async (ctx) => {
 
     // default start message
     return ctx.reply(
-        `👋 *Welcome ${name}!*\n\n` +
-        `I'm *STAC* 🎯 - Your Smart Settlement Tool\n\n` +
-        `I help you manage poker games, track buy-ins, and settle payments with crypto!`,
+        `welcome to straddle fun ♠️\n\n` +
+        `here are some commands to help you get started:\n\n` +
+        `• /createroom – start a new poker room\n` +
+        `• /joinroom – join an existing room\n` +
+        `• /addbuyin – add a buy-in to a player's stack (admin only)\n` +
+        `• /removebuyin – remove a player's buy-in (admin only)\n` +
+        `• /room <roomId> – view active and past room info, players, buy-ins, and cashouts\n` +
+        `• /myrooms – see your previous rooms\n` +
+        `• /setwallet <address> – set your solana or base wallet to receive payouts\n\n` +
+        `shuffle up and deal - your next hand is waiting🃏`,
         {
-            parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('📖 View Commands', 'show_help')],
-                [Markup.button.callback('🎯 Create Room', 'create_room_help')],
+                [Markup.button.callback('🎯 Create Room', 'create_room_now')],
                 [Markup.button.callback('💳 Setup Wallet', 'setup_wallet_help')]
             ])
         }
@@ -106,41 +112,27 @@ bot.start(async (ctx) => {
 
 // /help command
 const helpMessage =
-    `📖 *STAC COMMAND GUIDE*\n\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `🎯 *ROOM MANAGEMENT*\n` +
-    `━━━━━━━━━━━━━━━━━━\n\n` +
-    `/createroom - Create a new game room\n` +
-    `/invite <roomId> @user - Invite a player\n` +
-    `/join <roomId> - Join a room\n` +
-    `/room <roomId> - View room details\n` +
-    `/myrooms - List your rooms\n\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `💰 *BUY-INS & TRACKING*\n` +
-    `━━━━━━━━━━━━━━━━━━\n\n` +
-    `/addbuyin <roomId> <amount> - Add buy-in\n` +
-    `/removebuyin <roomId> <amount> - Remove buy-in\n` +
-    `/cashout <roomId> <amount> - Record final chips\n` +
-    `/summary <roomId> - View summary\n\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `💸 *SETTLEMENT*\n` +
-    `━━━━━━━━━━━━━━━━━━\n\n` +
-    `/settle <roomId> - Calculate & send payments\n\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `💳 *WALLET & PAYMENTS*\n` +
-    `━━━━━━━━━━━━━━━━━━\n\n` +
-    `/setwallet <address> - Set Solana wallet\n` +
-    `/stacpay <address> <amount> - Create payment\n` +
-    `/testpay - Test payment\n\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `⚙️ *GENERAL*\n` +
-    `━━━━━━━━━━━━━━━━━━\n\n` +
-    `/help - Show this help\n` +
-    `/ping - Check bot status`;
+    `straddle commands\n\n` +
+    `rooms\n\n` +
+    `/createroom – create a new poker room\n` +
+    `/invite <roomId> @username – invite a player to a room\n` +
+    `/joinroom <roomId> – join an existing room\n` +
+    `/room <roomId> – view active room info: players, buy-ins, stacks, cashouts\n` +
+    `/myrooms – view your previous rooms\n\n` +
+    `buy-ins & tracking\n\n` +
+    `/addbuyin <roomId> <amount> – add a buy-in to a player's stack (admin only)\n` +
+    `/removebuyin <roomId> <amount> – remove a buy-in from a player's stack (admin only)\n` +
+    `/cashout <roomId> <amount> – record a player's final chips\n\n` +
+    `settlement & payments\n\n` +
+    `/settle <roomId> – calculate final balances and generate payout links\n\n` +
+    `wallet\n\n` +
+    `/setwallet <address> – set your solana or base wallet to receive payouts\n\n` +
+    `general\n\n` +
+    `/help – show all commands\n` +
+    `/ping – check bot response time`;
 
 bot.command('help', (ctx) => {
     return ctx.reply(helpMessage, {
-        parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.callback('🎯 Create Room', 'create_room_now')],
             [Markup.button.callback('🏠 My Rooms', 'my_rooms_help')],
@@ -195,7 +187,7 @@ bot.command('ping', async (ctx) => {
 // callback query handlers for inline buttons
 bot.action('show_help', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.editMessageText(helpMessage, { parse_mode: 'Markdown' });
+    await ctx.editMessageText(helpMessage);
 });
 
 bot.action('create_room_help', async (ctx) => {
@@ -237,14 +229,20 @@ bot.action('show_start', async (ctx) => {
     const name = ctx.from?.first_name ?? 'there';
     await ctx.answerCbQuery();
     await ctx.editMessageText(
-        `👋 *Welcome ${name}!*\n\n` +
-        `I'm *STAC* 🎯 - Your Smart Settlement Tool\n\n` +
-        `I help you manage poker games, track buy-ins, and settle payments with crypto!`,
+        `welcome to straddle fun ♠️\n\n` +
+        `here are some commands to help you get started:\n\n` +
+        `• /createroom – start a new poker room\n` +
+        `• /joinroom – join an existing room\n` +
+        `• /addbuyin – add a buy-in to a player's stack (admin only)\n` +
+        `• /removebuyin – remove a player's buy-in (admin only)\n` +
+        `• /room <roomId> – view active and past room info, players, buy-ins, and cashouts\n` +
+        `• /myrooms – see your previous rooms\n` +
+        `• /setwallet <address> – set your solana or base wallet to receive payouts\n\n` +
+        `shuffle up and deal - your next hand is waiting🃏`,
         {
-            parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('📖 View Commands', 'show_help')],
-                [Markup.button.callback('🎯 Create Room', 'create_room_help')],
+                [Markup.button.callback('🎯 Create Room', 'create_room_now')],
                 [Markup.button.callback('💳 Setup Wallet', 'setup_wallet_help')]
             ])
         }
@@ -279,7 +277,7 @@ bot.telegram.setMyCommands([
     { command: 'createroom', description: '🎯 Create a new game room' },
     { command: 'myrooms', description: '🏠 View your rooms' },
     { command: 'invite', description: '👥 Invite a player' },
-    { command: 'join', description: '✅ Join a room' },
+    { command: 'joinroom', description: '✅ Join a room' },
     { command: 'room', description: '📊 View room details' },
     { command: 'addbuyin', description: '💰 Add buy-in' },
     { command: 'removebuyin', description: '💸 Remove buy-in' },

@@ -26,14 +26,12 @@ export function registerSetWallet(bot: Telegraf<Context>) {
                 );
             } else {
                 return ctx.reply(
-                    `💳 *Setup Your Wallet*\n\n` +
-                    `You haven't set up your Solana wallet yet.\n\n` +
-                    `*How to set up:*\n` +
-                    `1️⃣ Copy your Solana wallet address from Phantom\n` +
-                    `2️⃣ Use: \`/setwallet <your_address>\`\n\n` +
-                    `*Example:*\n` +
-                    `\`/setwallet 41Jw4SWMio5tfuqLWhe8QDHaUMoAEZnMV1PaBikrpBko\``,
-                    { parse_mode: 'Markdown' }
+                    `/setwallet <address>\n\n` +
+                    `examples:\n` +
+                    `/setwallet 7Gh....34xyz\n` +
+                    `/setwallet 0x91....4e8f\n\n` +
+                    `note:\n` +
+                    `This wallet will be used for all payouts - double check your address before submitting.`
                 );
             }
         }

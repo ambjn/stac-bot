@@ -11,13 +11,12 @@ export const registerAddBuyIn = (bot: Telegraf<Context>) => {
 
         if (!roomId || !amountStr) {
             return ctx.reply(
-                `💰 *Add Buy-in*\n\n` +
-                `*Usage:*\n` +
-                `\`/addbuyin <roomId> <amount>\`\n\n` +
-                `*Example:*\n` +
-                `\`/addbuyin abc123 100\`\n\n` +
-                `💡 Record each buy-in as you add chips during the game!`,
-                { parse_mode: 'Markdown' }
+                `/addbuyin <roomId> <amount>\n\n` +
+                `example:\n` +
+                `/addbuyin abc123 50\n` +
+                `/addbuyin abc123 100\n\n` +
+                `note:\n` +
+                `only room admins can add buy-ins, and the amount is added directly to the player's current stack.`
             );
         }
 
@@ -98,11 +97,12 @@ export const registerAddBuyIn = (bot: Telegraf<Context>) => {
         const roomId = ctx.match[1];
         await ctx.answerCbQuery();
         await ctx.reply(
-            `💰 *Add Another Buy-in*\n\n` +
-            `Use: \`/addbuyin ${roomId} <amount>\`\n\n` +
-            `*Example:*\n` +
-            `\`/addbuyin ${roomId} 50\``,
-            { parse_mode: 'Markdown' }
+            `/addbuyin <roomId> <amount>\n\n` +
+            `example:\n` +
+            `/addbuyin ${roomId} 50\n` +
+            `/addbuyin ${roomId} 100\n\n` +
+            `note:\n` +
+            `only room admins can add buy-ins, and the amount is added directly to the player's current stack.`
         );
     });
 };

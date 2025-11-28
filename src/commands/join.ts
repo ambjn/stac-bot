@@ -3,20 +3,18 @@ import { getRoom, getPlayer, updatePlayerJoined } from '../db';
 import { parseCommandArgs } from '../utils/parse';
 
 export const registerJoin = (bot: Telegraf<Context>) => {
-    bot.command('join', async (ctx) => {
+    const handleJoin = async (ctx: Context) => {
         const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
         const args = parseCommandArgs(text);
         const [roomId] = args;
 
         if (!roomId) {
             return ctx.reply(
-                `🎯 *Join a Room*\n\n` +
-                `*Usage:*\n` +
-                `\`/join <roomId>\`\n\n` +
-                `*Example:*\n` +
-                `\`/join abc123\`\n\n` +
-                `💡 You need an invitation to join a room!`,
-                { parse_mode: 'Markdown' }
+                `/joinroom <roomId>\n\n` +
+                `example:\n` +
+                `/joinroom abc123\n\n` +
+                `note:\n` +
+                `you can only join a room that is active and not closed.`
             );
         }
 
@@ -98,19 +96,23 @@ export const registerJoin = (bot: Telegraf<Context>) => {
                 ])
             }
         );
-    });
+    };
+
+    // Register both join and joinroom commands
+    bot.command('join', handleJoin);
+    bot.command('joinroom', handleJoin);
 
     // Callback handler
     bot.action(/addbuyin_help_(.+)/, async (ctx) => {
         const roomId = ctx.match[1];
         await ctx.answerCbQuery();
         await ctx.reply(
-            `💰 *Add Buy-in*\n\n` +
-            `Use: \`/addbuyin ${roomId} <amount>\`\n\n` +
-            `*Example:*\n` +
-            `\`/addbuyin ${roomId} 100\`\n\n` +
-            `💡 Record each buy-in as you add chips!`,
-            { parse_mode: 'Markdown' }
+            `/addbuyin <roomId> <amount>\n\n` +
+            `example:\n` +
+            `/addbuyin ${roomId} 50\n` +
+            `/addbuyin ${roomId} 100\n\n` +
+            `note:\n` +
+            `only room admins can add buy-ins, and the amount is added directly to the player's current stack.`
         );
     });
 };

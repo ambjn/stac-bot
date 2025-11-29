@@ -1,5 +1,6 @@
 import { supabase } from './connection';
 import { Room, Player, BuyInEntry, Settlement, PlayerPnL, RoomSettlement } from '../state/types';
+import { cache } from '../utils/cache';
 
 // room operations
 export const createRoom = async (room: Omit<Room, 'players' | 'createdAt' | 'settled'>): Promise<Room> => {
@@ -24,7 +25,15 @@ export const createRoom = async (room: Omit<Room, 'players' | 'createdAt' | 'set
     };
 };
 
-export const getRoom = async (roomId: string): Promise<Room | null> => {
+export const getRoom = async (roomId: string, useCache: boolean = true): Promise<Room | null> => {
+    const cacheKey = `room:${roomId}`;
+
+    // check cache first
+    if (useCache) {
+        const cached = cache.get<Room>(cacheKey);
+        if (cached) return cached;
+    }
+
     const { data: roomData, error: roomError } = await supabase
         .from('rooms')
         .select('*')
@@ -35,7 +44,7 @@ export const getRoom = async (roomId: string): Promise<Room | null> => {
 
     const players = await getPlayers(roomId);
 
-    return {
+    const room: Room = {
         id: roomData.id,
         ownerId: roomData.owner_id,
         ownerUsername: roomData.owner_username,
@@ -43,6 +52,11 @@ export const getRoom = async (roomId: string): Promise<Room | null> => {
         createdAt: new Date(roomData.created_at),
         settled: roomData.settled
     };
+
+    // cache for 10 seconds
+    cache.set(cacheKey, room, 10000);
+
+    return room;
 };
 
 export const deleteRoom = async (roomId: string): Promise<boolean> => {
@@ -50,6 +64,9 @@ export const deleteRoom = async (roomId: string): Promise<boolean> => {
         .from('rooms')
         .delete()
         .eq('id', roomId);
+
+    // invalidate cache
+    cache.delete(`room:${roomId}`);
 
     return !error;
 };
@@ -59,6 +76,9 @@ export const setRoomSettled = async (roomId: string, settled: boolean): Promise<
         .from('rooms')
         .update({ settled })
         .eq('id', roomId);
+
+    // invalidate cache
+    cache.delete(`room:${roomId}`);
 };
 
 export const getRoomsByUser = async (userId: number, username: string): Promise<{ id: string; role: string }[]> => {
@@ -90,6 +110,94 @@ export const getRoomsByUser = async (userId: number, username: string): Promise<
     }
 
     return rooms;
+};
+
+// Get the active room for an owner (prioritizes rooms with players/buyins that aren't settled)
+export const getActiveRoomForOwner = async (userId: number): Promise<string | null> => {
+    const cacheKey = `active_room:${userId}`;
+
+    // check cache first (5 second TTL for active room)
+    const cached = cache.get<string>(cacheKey);
+    if (cached) return cached;
+
+    // get all rooms owned by user with player and buy-in data in one query
+    const { data: ownedRooms } = await supabase
+        .from('rooms')
+        .select(`
+            id,
+            settled,
+            created_at
+        `)
+        .eq('owner_id', userId)
+        .order('created_at', { ascending: false });
+
+    if (!ownedRooms || ownedRooms.length === 0) {
+        return null;
+    }
+
+    // get player counts and buy-in totals for all rooms in one query
+    const roomIds = ownedRooms.map(r => r.id);
+    const { data: playerStats } = await supabase
+        .from('players')
+        .select('room_id, buy_in')
+        .in('room_id', roomIds);
+
+    // build stats map
+    const statsMap = new Map<string, { playerCount: number; totalBuyIn: number }>();
+    if (playerStats) {
+        for (const p of playerStats) {
+            const existing = statsMap.get(p.room_id) || { playerCount: 0, totalBuyIn: 0 };
+            existing.playerCount++;
+            existing.totalBuyIn += p.buy_in || 0;
+            statsMap.set(p.room_id, existing);
+        }
+    }
+
+    let activeRoomId: string | null = null;
+
+    // prioritize: unsettled rooms with players and buy-ins
+    for (const roomData of ownedRooms) {
+        if (roomData.settled) continue;
+        const stats = statsMap.get(roomData.id);
+        if (stats && stats.playerCount > 0 && stats.totalBuyIn > 0) {
+            activeRoomId = roomData.id;
+            break;
+        }
+    }
+
+    // fallback: unsettled rooms with players (even without buy-ins)
+    if (!activeRoomId) {
+        for (const roomData of ownedRooms) {
+            if (roomData.settled) continue;
+            const stats = statsMap.get(roomData.id);
+            if (stats && stats.playerCount > 0) {
+                activeRoomId = roomData.id;
+                break;
+            }
+        }
+    }
+
+    // fallback: any unsettled room
+    if (!activeRoomId) {
+        for (const roomData of ownedRooms) {
+            if (!roomData.settled) {
+                activeRoomId = roomData.id;
+                break;
+            }
+        }
+    }
+
+    // last resort: most recent room (even if settled)
+    if (!activeRoomId) {
+        activeRoomId = ownedRooms[0].id;
+    }
+
+    // cache for 5 seconds
+    if (activeRoomId) {
+        cache.set(cacheKey, activeRoomId, 5000);
+    }
+
+    return activeRoomId;
 };
 
 // player operations
@@ -160,16 +268,40 @@ export const getPlayers = async (roomId: string): Promise<Player[]> => {
 
     if (error || !data) return [];
 
-    const players = await Promise.all(
-        data.map(async (row: any) => ({
-            userId: row.user_id,
-            username: row.username,
-            buyIn: row.buy_in,
-            cashOut: row.cash_out,
-            joined: row.joined,
-            history: await getPlayerHistory(row.id)
-        }))
-    );
+    // get all player IDs
+    const playerIds = data.map((row: any) => row.id);
+
+    // fetch all histories in one query
+    const { data: allHistories } = await supabase
+        .from('buyin_history')
+        .select('*')
+        .in('player_id', playerIds)
+        .order('timestamp', { ascending: false });
+
+    // group histories by player_id
+    const historyMap = new Map<number, BuyInEntry[]>();
+    if (allHistories) {
+        for (const h of allHistories) {
+            if (!historyMap.has(h.player_id)) {
+                historyMap.set(h.player_id, []);
+            }
+            historyMap.get(h.player_id)!.push({
+                amount: h.amount,
+                action: h.action as 'add' | 'remove',
+                timestamp: new Date(h.timestamp)
+            });
+        }
+    }
+
+    // build players with their histories
+    const players = data.map((row: any) => ({
+        userId: row.user_id,
+        username: row.username,
+        buyIn: row.buy_in,
+        cashOut: row.cash_out,
+        joined: row.joined,
+        history: historyMap.get(row.id) || []
+    }));
 
     return players;
 };
@@ -180,6 +312,9 @@ export const updatePlayerJoined = async (roomId: string, username: string, userI
         .update({ joined: true, user_id: userId })
         .eq('room_id', roomId)
         .eq('username', username);
+
+    // invalidate room cache
+    cache.delete(`room:${roomId}`);
 };
 
 export const updatePlayerBuyIn = async (
@@ -247,6 +382,10 @@ export const updatePlayerBuyIn = async (
             action
         });
 
+    // invalidate caches
+    cache.delete(`room:${roomId}`);
+    cache.delete(`active_room:${userId}`);
+
     return { success: true, newTotal };
 };
 
@@ -272,6 +411,9 @@ export const updatePlayerCashOut = async (
         .from('players')
         .update({ cash_out: amount })
         .eq('id', playerData.id);
+
+    // invalidate room cache
+    cache.delete(`room:${roomId}`);
 
     return { success: true };
 };

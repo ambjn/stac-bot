@@ -11,13 +11,9 @@ export const registerRoom = (bot: Telegraf<Context>) => {
 
         if (!roomId) {
             return ctx.reply(
-                `🎯 *View Room Details*\n\n` +
-                `*Usage:*\n` +
-                `\`/room <roomId>\`\n\n` +
-                `*Example:*\n` +
-                `\`/room abc123\`\n\n` +
-                `Use \`/myrooms\` to see all your rooms!`,
-                { parse_mode: 'Markdown' }
+                `/room <roomId>\n\n` +
+                `note:\n` +
+                `you can use this command to view both your active rooms and your past rooms.`
             );
         }
 

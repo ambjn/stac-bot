@@ -11,8 +11,6 @@ export const registerJoin = (bot: Telegraf<Context>) => {
         if (!roomId) {
             return ctx.reply(
                 `/joinroom <roomId>\n\n` +
-                `example:\n` +
-                `/joinroom abc123\n\n` +
                 `note:\n` +
                 `you can only join a room that is active and not closed.`
             );

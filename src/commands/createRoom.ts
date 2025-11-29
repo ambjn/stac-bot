@@ -15,10 +15,11 @@ export const registerCreateRoom = (bot: Telegraf<Context>) => {
         });
 
         ctx.reply(
-            `room created: ${roomId}\n\n` +
-            `invite players → /invite ${roomId} @username\n` +
-            `view room → /room ${roomId}`,
+            `room created: \`${roomId}\`\n\n` +
+            `invite players → \`/invite ${roomId}\`\n` +
+            `view room → \`/room ${roomId}\``,
             {
+                parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('👥 Invite Players', `invite_help_${roomId}`)],
                     [Markup.button.callback('🎯 View Room', `view_room_${roomId}`)]

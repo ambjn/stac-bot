@@ -31,7 +31,7 @@ export function registerSetWallet(bot: Telegraf<Context>) {
                     `/setwallet 7Gh....34xyz\n` +
                     `/setwallet 0x91....4e8f\n\n` +
                     `note:\n` +
-                    `This wallet will be used for all payouts - double check your address before submitting.`
+                    `this wallet will be used for all payouts - double check your address before submitting.`
                 );
             }
         }

@@ -166,19 +166,31 @@ bot.action('show_help', async (ctx) => {
     await ctx.editMessageText(helpMessage);
 });
 
-bot.action('create_room_help', async (ctx) => {
+bot.action('create_room_now', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.editMessageText(
-        `🎯 *Creating a Room*\n\n` +
-        `1️⃣ Use \`/createroom\` to start\n` +
-        `2️⃣ Get your room ID\n` +
-        `3️⃣ Invite players with \`/invite <roomId> @username\`\n` +
-        `4️⃣ Players can join with the invite link\n\n` +
-        `Ready to create your first room?`,
+    // Execute the createroom logic directly
+    const { createRoom } = require('./db/rooms');
+    const { generateRoomId } = require('./utils/format');
+
+    const roomId = generateRoomId();
+    const ownerId = ctx.from!.id;
+    const ownerUsername = ctx.from!.username ?? ctx.from!.first_name ?? 'unknown';
+
+    await createRoom({
+        id: roomId,
+        ownerId,
+        ownerUsername
+    });
+
+    ctx.reply(
+        `room created: \`${roomId}\`\n\n` +
+        `invite players → \`/invite ${roomId}\`\n` +
+        `view room → \`/room ${roomId}\``,
         {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-                [Markup.button.callback('⬅️ Back', 'show_start')]
+                [Markup.button.callback('👥 Invite Players', `invite_help_${roomId}`)],
+                [Markup.button.callback('🎯 View Room', `view_room_${roomId}`)]
             ])
         }
     );
@@ -186,18 +198,14 @@ bot.action('create_room_help', async (ctx) => {
 
 bot.action('setup_wallet_help', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.editMessageText(
-        `💳 *Setting Up Your Wallet*\n\n` +
-        `1️⃣ Install Phantom wallet\n` +
-        `2️⃣ Copy your wallet address\n` +
-        `3️⃣ Use \`/setwallet <your_address>\`\n\n` +
-        `Your wallet will receive settlement payments automatically!`,
-        {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('⬅️ Back', 'show_start')]
-            ])
-        }
+    // Show the setwallet help message
+    await ctx.reply(
+        `/setwallet <address>\n\n` +
+        `examples:\n` +
+        `/setwallet 7Gh....34xyz\n` +
+        `/setwallet 0x91....4e8f\n\n` +
+        `note:\n` +
+        `this wallet will be used for all payouts - double check your address before submitting.`
     );
 });
 
@@ -271,10 +279,54 @@ bot.action('cancel_delete', async (ctx) => {
 
 bot.action('view_myrooms', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-        `Use \`/myrooms\` to see all your rooms!`,
-        { parse_mode: 'Markdown' }
-    );
+    // The actual /myrooms command will be triggered via the command system
+    // We need to manually invoke the myrooms logic here
+    const { getOwnedRooms, getJoinedRooms } = require('./db/rooms');
+    const userId = ctx.from!.id;
+    const ownedRooms = await getOwnedRooms(userId);
+    const joinedRooms = await getJoinedRooms(userId);
+
+    if (ownedRooms.length === 0 && joinedRooms.length === 0) {
+        return ctx.reply(
+            `📋 *My Rooms*\n\n` +
+            `You haven't created or joined any rooms yet.\n\n` +
+            `💡 Create your first room with \`/createroom\``,
+            { parse_mode: 'Markdown' }
+        );
+    }
+
+    // Build the response with inline buttons
+    const buttons: any[] = [];
+    let message = `📋 *My Rooms*\n\n`;
+
+    if (ownedRooms.length > 0) {
+        message += `👑 *Owned Rooms* (${ownedRooms.length})\n\n`;
+        for (const room of ownedRooms) {
+            const status = room.settled ? '✅' : '🎮';
+            message += `${status} \`${room.id}\` - ${room.players.length} players\n`;
+            buttons.push([
+                Markup.button.callback(`📊 View ${room.id}`, `view_room_${room.id}`),
+                Markup.button.callback(`🗑️ Delete`, `delete_room_${room.id}`)
+            ]);
+        }
+        message += `\n`;
+    }
+
+    if (joinedRooms.length > 0) {
+        message += `👥 *Joined Rooms* (${joinedRooms.length})\n\n`;
+        for (const room of joinedRooms) {
+            const status = room.settled ? '✅' : '🎮';
+            message += `${status} \`${room.id}\` - Owner: @${room.ownerUsername}\n`;
+            buttons.push([
+                Markup.button.callback(`📊 View ${room.id}`, `view_room_${room.id}`)
+            ]);
+        }
+    }
+
+    ctx.reply(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons)
+    });
 });
 
 // register room commands

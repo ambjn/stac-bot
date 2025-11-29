@@ -76,16 +76,6 @@ export const registerMyRooms = (bot: Telegraf<Context>) => {
     });
 
     // Callback handlers
-    bot.action('create_room_now', async (ctx) => {
-        await ctx.answerCbQuery();
-        await ctx.reply(
-            `🎯 *Create a New Room*\n\n` +
-            `Use: \`/createroom\`\n\n` +
-            `This will create a new game room instantly!`,
-            { parse_mode: 'Markdown' }
-        );
-    });
-
     bot.action('room_guide', async (ctx) => {
         await ctx.answerCbQuery();
         await ctx.reply(

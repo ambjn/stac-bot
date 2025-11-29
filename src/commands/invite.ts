@@ -158,7 +158,6 @@ export const registerInvite = (bot: Telegraf<Context>) => {
         ctx.reply(response, {
             parse_mode: 'MarkdownV2',
             ...Markup.inlineKeyboard([
-                [Markup.button.url('🔗 Join Link', joinLink)],
                 [Markup.button.callback('👥 Invite More', `invite_more_${roomId}`)],
                 [Markup.button.callback('🎯 View Room', `view_room_${roomId}`)]
             ])
